@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
 import Loading from "@/components/shared/Loading"
 import { getActiveStore, submitStoreApplication } from "@/lib/storeRegistry"
+import { notifyStoreEvent } from "@/lib/notifyClient"
 
 export default function CreateStore() {
     const router = useRouter()
@@ -50,12 +51,19 @@ export default function CreateStore() {
     const onSubmitHandler = async (e) => {
         e.preventDefault()
         const store = await submitStoreApplication(storeInfo)
+        const notify = await notifyStoreEvent("store_submitted", store)
         setAlreadySubmitted(true)
         setStatus(store.status)
         setMessage(
             `Thanks, ${store.name}! Your Crafthand Market application for @${store.username} is submitted and pending admin approval.`
         )
-        toast.success("Application submitted for review")
+        if (notify.skipped) {
+            toast.success("Application saved. Email not configured yet on the server.")
+        } else if (!notify.ok) {
+            toast.success("Application saved, but confirmation email failed to send.")
+        } else {
+            toast.success("Application submitted — confirmation email sent")
+        }
         return store
     }
 

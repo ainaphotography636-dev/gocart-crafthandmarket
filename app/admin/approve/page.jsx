@@ -4,6 +4,7 @@ import Loading from "@/components/shared/Loading"
 import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { listPendingStores, updateStoreStatus } from "@/lib/storeRegistry"
+import { notifyStoreEvent } from "@/lib/notifyClient"
 
 export default function AdminApprove() {
     const [stores, setStores] = useState([])
@@ -18,7 +19,16 @@ export default function AdminApprove() {
         const updated = updateStoreStatus(storeId, status)
         if (!updated) throw new Error("Store application not found")
         setStores(listPendingStores())
-        toast.success(status === "approved" ? "Store approved" : "Store rejected")
+
+        const event = status === "approved" ? "store_approved" : "store_rejected"
+        const notify = await notifyStoreEvent(event, updated)
+        if (notify.skipped) {
+            toast.success(status === "approved" ? "Store approved (email not configured)" : "Store rejected (email not configured)")
+        } else if (!notify.ok) {
+            toast.success(status === "approved" ? "Store approved, but email failed" : "Store rejected, but email failed")
+        } else {
+            toast.success(status === "approved" ? "Store approved — artisan emailed" : "Store rejected — artisan emailed")
+        }
         return updated
     }
 

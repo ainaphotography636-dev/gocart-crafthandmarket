@@ -12,6 +12,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.758.0",
     "@reduxjs/toolkit": "^2.8.2",
     "@tailwindcss/postcss": "^4",
     "date-fns": "^4.1.0",

@@ -1,11 +1,11 @@
 'use client'
 import { dummyStoreDashboardData } from "@/assets/assets"
-import Loading from "@/components/Loading"
+import Loading from "@/components/shared/Loading"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { useCurrency } from "@/components/CurrencyProvider"
+import { useCurrency } from "@/components/shared/CurrencyProvider"
 
 export default function Dashboard() {
 

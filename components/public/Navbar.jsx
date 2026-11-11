@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSelector } from "react-redux";
-import BrandLogo from "@/components/BrandLogo";
-import CurrencySwitcher from "@/components/CurrencySwitcher";
+import BrandLogo from "@/components/shared/BrandLogo";
+import CurrencySwitcher from "@/components/shared/CurrencySwitcher";
 
 const Navbar = () => {
 

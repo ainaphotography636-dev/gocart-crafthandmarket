@@ -5,7 +5,7 @@ import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
 import RatingModal from "./RatingModal";
-import { useCurrency } from "@/components/CurrencyProvider";
+import { useCurrency } from "@/components/shared/CurrencyProvider";
 
 const OrderItem = ({ order }) => {
 

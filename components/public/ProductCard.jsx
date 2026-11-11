@@ -3,7 +3,7 @@ import { StarIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import { useCurrency } from '@/components/CurrencyProvider'
+import { useCurrency } from '@/components/shared/CurrencyProvider'
 
 const ProductCard = ({ product }) => {
 

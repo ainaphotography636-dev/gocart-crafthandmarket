@@ -1,6 +1,6 @@
 'use client'
-import BrandLogo from "@/components/BrandLogo"
-import CurrencySwitcher from "@/components/CurrencySwitcher"
+import BrandLogo from "@/components/shared/BrandLogo"
+import CurrencySwitcher from "@/components/shared/CurrencySwitcher"
 
 const AdminNavbar = () => {
 

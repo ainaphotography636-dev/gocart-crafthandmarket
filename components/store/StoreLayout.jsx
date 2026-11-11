@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from "react"
-import Loading from "../Loading"
+import Loading from "@/components/shared/Loading"
 import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"

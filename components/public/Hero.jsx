@@ -4,7 +4,7 @@ import { ArrowRightIcon, ChevronRightIcon } from 'lucide-react'
 import Image from 'next/image'
 import React from 'react'
 import CategoriesMarquee from './CategoriesMarquee'
-import { useCurrency } from '@/components/CurrencyProvider'
+import { useCurrency } from '@/components/shared/CurrencyProvider'
 
 const Hero = () => {
 

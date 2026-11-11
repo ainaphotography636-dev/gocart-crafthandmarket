@@ -1,10 +1,10 @@
 'use client'
 import { dummyAdminDashboardData } from "@/assets/assets"
-import Loading from "@/components/Loading"
-import OrdersAreaChart from "@/components/OrdersAreaChart"
+import Loading from "@/components/shared/Loading"
+import OrdersAreaChart from "@/components/admin/OrdersAreaChart"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StoreIcon, TagsIcon } from "lucide-react"
 import { useEffect, useState } from "react"
-import { useCurrency } from "@/components/CurrencyProvider"
+import { useCurrency } from "@/components/shared/CurrencyProvider"
 
 export default function AdminDashboard() {
 

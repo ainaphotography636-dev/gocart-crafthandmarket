@@ -1,13 +1,13 @@
 'use client'
-import Counter from "@/components/Counter";
-import OrderSummary from "@/components/OrderSummary";
-import PageTitle from "@/components/PageTitle";
+import Counter from "@/components/public/Counter";
+import OrderSummary from "@/components/public/OrderSummary";
+import PageTitle from "@/components/public/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
 import { Trash2Icon } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useCurrency } from "@/components/CurrencyProvider";
+import { useCurrency } from "@/components/shared/CurrencyProvider";
 
 export default function Cart() {
 

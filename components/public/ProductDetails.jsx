@@ -7,7 +7,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Counter from "./Counter";
 import { useDispatch, useSelector } from "react-redux";
-import { useCurrency } from "@/components/CurrencyProvider";
+import { useCurrency } from "@/components/shared/CurrencyProvider";
 
 const ProductDetails = ({ product }) => {
 

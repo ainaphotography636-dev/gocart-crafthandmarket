@@ -1,7 +1,7 @@
 import { Outfit } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import StoreProvider from "@/app/StoreProvider";
-import { CurrencyProvider } from "@/components/CurrencyProvider";
+import { CurrencyProvider } from "@/components/shared/CurrencyProvider";
 import "./globals.css";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600"] });

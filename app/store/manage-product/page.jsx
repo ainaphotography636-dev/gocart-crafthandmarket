@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react"
 import { toast } from "react-hot-toast"
 import Image from "next/image"
-import Loading from "@/components/Loading"
+import Loading from "@/components/shared/Loading"
 import { productDummyData } from "@/assets/assets"
-import { useCurrency } from "@/components/CurrencyProvider"
+import { useCurrency } from "@/components/shared/CurrencyProvider"
 
 export default function StoreManageProducts() {
 

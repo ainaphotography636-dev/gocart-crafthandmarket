@@ -5,7 +5,7 @@ import AddressModal from './AddressModal'
 import { useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
-import { useCurrency } from '@/components/CurrencyProvider'
+import { useCurrency } from '@/components/shared/CurrencyProvider'
 
 const OrderSummary = ({ totalPrice, items }) => {
 

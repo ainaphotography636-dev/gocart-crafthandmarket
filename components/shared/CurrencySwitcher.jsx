@@ -1,5 +1,5 @@
 'use client'
-import { useCurrency } from '@/components/CurrencyProvider'
+import { useCurrency } from '@/components/shared/CurrencyProvider'
 
 export default function CurrencySwitcher({ className = '' }) {
   const { currencyCode, setCurrencyCode, currencies } = useCurrency()

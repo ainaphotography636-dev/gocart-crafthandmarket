@@ -7,10 +7,14 @@ const badgeStyles = {
   store: 'bg-brand-emerald text-white',
 }
 
+/**
+ * Crafthand Market brand mark — shared across public, store, and admin shells.
+ */
 export default function BrandLogo({ href = '/', badge, className = '' }) {
   return (
     <Link
       href={href}
+      aria-label="Crafthand Market home"
       className={`relative inline-flex items-center gap-2 text-xl sm:text-2xl font-semibold tracking-tight text-slate-800 ${className}`}
     >
       <span className="leading-none">

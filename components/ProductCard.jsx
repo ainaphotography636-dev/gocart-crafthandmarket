@@ -3,10 +3,12 @@ import { StarIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
+import { useCurrency } from '@/components/CurrencyProvider'
 
 const ProductCard = ({ product }) => {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const { currency } = useCurrency()
+    const currencySymbol = currency.symbol
 
     // calculate the average rating of the product
     const rating = Math.round(product.rating.reduce((acc, curr) => acc + curr.rating, 0) / product.rating.length);
@@ -21,11 +23,11 @@ const ProductCard = ({ product }) => {
                     <p>{product.name}</p>
                     <div className='flex'>
                         {Array(5).fill('').map((_, index) => (
-                            <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={rating >= index + 1 ? "#00C950" : "#D1D5DB"} />
+                            <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={rating >= index + 1 ? "#047857" : "#D1D5DB"} />
                         ))}
                     </div>
                 </div>
-                <p>{currency}{product.price}</p>
+                <p>{currencySymbol}{product.price}</p>
             </div>
         </Link>
     )

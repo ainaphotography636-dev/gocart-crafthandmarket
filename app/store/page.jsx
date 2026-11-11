@@ -5,10 +5,12 @@ import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lu
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useCurrency } from "@/components/CurrencyProvider"
 
 export default function Dashboard() {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const { currency: currencyInfo } = useCurrency()
+    const currency = currencyInfo.symbol
 
     const router = useRouter()
 
@@ -78,7 +80,7 @@ export default function Dashboard() {
                                     <p className="font-medium">{review.product?.name}</p>
                                     <div className='flex items-center'>
                                         {Array(5).fill('').map((_, index) => (
-                                            <StarIcon key={index} size={17} className='text-transparent mt-0.5' fill={review.rating >= index + 1 ? "#00C950" : "#D1D5DB"} />
+                                            <StarIcon key={index} size={17} className='text-transparent mt-0.5' fill={review.rating >= index + 1 ? "#047857" : "#D1D5DB"} />
                                         ))}
                                     </div>
                                 </div>

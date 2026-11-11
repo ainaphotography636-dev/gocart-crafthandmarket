@@ -1,22 +1,42 @@
 @import "tailwindcss";
 
+/* Crafthand Market — premium artisan palette (Tailwind v4 theme tokens) */
+@theme {
+  --color-brand-amber: #c2410c;
+  --color-brand-amber-light: #fdba74;
+  --color-brand-amber-soft: #fff7ed;
+  --color-brand-emerald: #047857;
+  --color-brand-emerald-light: #6ee7b7;
+  --color-brand-emerald-soft: #ecfdf5;
+  --color-brand-gold: #b45309;
+  --color-brand-gold-light: #fbbf24;
+  --color-brand-gold-rich: #ca8a04;
+  --color-brand-ink: #292524;
+  --color-brand-cream: #faf6f1;
+}
+
 @layer components {
-    @keyframes marqueeScroll {
-        0% {
-            transform: translateX(0%);
-        }
-        100% {
-            transform: translateX(-50%);
-        }
+  @keyframes marqueeScroll {
+    0% {
+      transform: translateX(0%);
     }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
 }
 
 @layer base {
-    button {
-        cursor: pointer;
-    }
+  button {
+    cursor: pointer;
+  }
+
+  body {
+    background-color: var(--color-brand-cream);
+    color: var(--color-brand-ink);
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  display: none;
 }

@@ -7,11 +7,13 @@ import { useState } from "react";
 import Image from "next/image";
 import Counter from "./Counter";
 import { useDispatch, useSelector } from "react-redux";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 const ProductDetails = ({ product }) => {
 
     const productId = product.id;
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
+    const { currency: currencyInfo } = useCurrency();
+    const currency = currencyInfo.symbol;
 
     const cart = useSelector(state => state.cart.cartItems);
     const dispatch = useDispatch();
@@ -44,7 +46,7 @@ const ProductDetails = ({ product }) => {
                 <h1 className="text-3xl font-semibold text-slate-800">{product.name}</h1>
                 <div className='flex items-center mt-2'>
                     {Array(5).fill('').map((_, index) => (
-                        <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={averageRating >= index + 1 ? "#00C950" : "#D1D5DB"} />
+                        <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={averageRating >= index + 1 ? "#047857" : "#D1D5DB"} />
                     ))}
                     <p className="text-sm ml-3 text-slate-500">{product.rating.length} Reviews</p>
                 </div>

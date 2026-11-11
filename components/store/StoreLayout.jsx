@@ -5,18 +5,29 @@ import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
-import { dummyStoreData } from "@/assets/assets"
+import { getActiveStore } from "@/lib/storeRegistry"
 
 const StoreLayout = ({ children }) => {
-
-
     const [isSeller, setIsSeller] = useState(false)
     const [loading, setLoading] = useState(true)
     const [storeInfo, setStoreInfo] = useState(null)
+    const [status, setStatus] = useState("")
 
     const fetchIsSeller = async () => {
-        setIsSeller(true)
-        setStoreInfo(dummyStoreData)
+        const store = getActiveStore()
+        if (store?.status === "approved" && store.isActive) {
+            setIsSeller(true)
+            setStoreInfo(store)
+            setStatus(store.status)
+        } else if (store) {
+            setIsSeller(false)
+            setStoreInfo(store)
+            setStatus(store.status)
+        } else {
+            setIsSeller(false)
+            setStoreInfo(null)
+            setStatus("")
+        }
         setLoading(false)
     }
 
@@ -38,10 +49,34 @@ const StoreLayout = ({ children }) => {
         </div>
     ) : (
         <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">
-            <h1 className="text-2xl sm:text-4xl font-semibold text-slate-400">You are not authorized to access this page</h1>
-            <Link href="/" className="bg-slate-700 text-white flex items-center gap-2 mt-8 p-2 px-6 max-sm:text-sm rounded-full">
-                Go to home <ArrowRightIcon size={18} />
-            </Link>
+            <h1 className="text-2xl sm:text-4xl font-semibold text-slate-400">
+                {status === "pending"
+                    ? "Your workshop is waiting for admin approval"
+                    : status === "rejected"
+                      ? "Your workshop application was rejected"
+                      : "No artisan store is connected yet"}
+            </h1>
+            <p className="mt-4 max-w-xl text-slate-500">
+                {status === "pending"
+                    ? "Ask an admin to approve your application at /admin/approve, then return here."
+                    : "Register your Kerala workshop from the create-store page to start selling on Crafthand Market."}
+            </p>
+            <div className="flex flex-wrap gap-3 mt-8 justify-center">
+                <Link
+                    href="/create-store"
+                    className="bg-brand-emerald text-white flex items-center gap-2 p-2 px-6 max-sm:text-sm rounded-full"
+                >
+                    Register workshop <ArrowRightIcon size={18} />
+                </Link>
+                {status === "pending" && (
+                    <Link
+                        href="/admin/approve"
+                        className="border border-brand-amber text-brand-amber flex items-center gap-2 p-2 px-6 max-sm:text-sm rounded-full"
+                    >
+                        Open approvals
+                    </Link>
+                )}
+            </div>
         </div>
     )
 }

@@ -10,8 +10,11 @@ datasource db {
 }
 
 /// Platform staff roles for the Crafthand Market admin console.
+/// Hierarchy (highest → lowest):
+/// SUPER_ADMIN (locked, exactly one founder) → MAIN_ADMIN → OPERATIONS → ARTISAN_LEAD → B2B_TRADE
 enum AdminRole {
   SUPER_ADMIN
+  MAIN_ADMIN
   OPERATIONS
   ARTISAN_LEAD
   B2B_TRADE
@@ -62,6 +65,12 @@ model User {
   cart  Json      @default("{}")
   /// Admin console role. Null means regular buyer/artisan (no admin access).
   role  AdminRole?
+  /// Granular module grants for non-super-admin staff (e.g. admin.catalog).
+  /// SUPER_ADMIN always resolves to ["*"] and must not be customized.
+  /// Empty array means "use the default grants for `role`".
+  permissions String[] @default([])
+  /// Marks the single locked founder Super Admin account.
+  isFounder   Boolean  @default(false)
 
   // Relations
   ratings     Rating[]
@@ -69,6 +78,8 @@ model User {
   store       Store?
   buyerOrders Order[]      @relation("BuyerRelation")
   b2bOwned    B2BInquiry[] @relation("B2BOwner")
+
+  @@index([role])
 }
 
 // Required for creating a Product: name, description, mrp, price, images, category, storeId

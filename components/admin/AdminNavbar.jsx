@@ -1,7 +1,7 @@
 'use client'
 import BrandLogo from "@/components/shared/BrandLogo"
 import CurrencySwitcher from "@/components/shared/CurrencySwitcher"
-import { AdminRole, ROLE_LABELS } from "@/lib/adminPermissions"
+import { ROLE_HIERARCHY, ROLE_LABELS } from "@/lib/adminPermissions"
 
 const AdminNavbar = ({ role, onRoleChange }) => {
   return (
@@ -10,14 +10,14 @@ const AdminNavbar = ({ role, onRoleChange }) => {
       <div className="flex items-center gap-3 text-slate-600">
         <CurrencySwitcher className="max-sm:hidden" />
         <label className="flex items-center gap-2 text-sm">
-          <span className="max-sm:hidden">Role</span>
+          <span className="max-sm:hidden">Preview role</span>
           <select
             value={role}
             onChange={(e) => onRoleChange?.(e.target.value)}
-            className="border border-slate-200 rounded-md bg-white px-2 py-1.5 text-sm outline-none"
-            aria-label="Admin role"
+            className="border border-slate-200 rounded-md bg-white px-2 py-1.5 text-sm outline-none max-w-[220px]"
+            aria-label="Admin role preview"
           >
-            {Object.values(AdminRole).map((value) => (
+            {ROLE_HIERARCHY.map((value) => (
               <option key={value} value={value}>
                 {ROLE_LABELS[value]}
               </option>

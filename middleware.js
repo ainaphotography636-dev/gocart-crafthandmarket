@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server"
 import {
+  ADMIN_PERMISSIONS_COOKIE,
   ADMIN_ROLE_COOKIE,
   canAccessPath,
+  decodePermissionsCookie,
   isValidAdminRole,
   normalizeAdminRole,
 } from "@/lib/adminPermissions"
 
 /**
- * Edge middleware: gate /admin/* by the crafthand_admin_role cookie.
- * Until Clerk/NextAuth is wired to Prisma User.role, the cookie is the
- * active session role (set from the admin role switcher / staff page).
+ * Edge middleware: gate /admin/* by role + optional custom permission cookie.
  */
 export function middleware(request) {
   const { pathname } = request.nextUrl
@@ -18,15 +18,16 @@ export function middleware(request) {
     return NextResponse.next()
   }
 
-  // Allow Next internals / static assets under admin if any
   if (pathname.startsWith("/admin/_next")) {
     return NextResponse.next()
   }
 
   const rawRole = request.cookies.get(ADMIN_ROLE_COOKIE)?.value
   const role = isValidAdminRole(rawRole) ? rawRole : normalizeAdminRole(rawRole)
+  const permissions = decodePermissionsCookie(
+    request.cookies.get(ADMIN_PERMISSIONS_COOKIE)?.value || ""
+  )
 
-  // Seed cookie on first visit so local/preview admin remains usable.
   const response = NextResponse.next()
   if (!isValidAdminRole(rawRole)) {
     response.cookies.set(ADMIN_ROLE_COOKIE, role, {
@@ -36,7 +37,7 @@ export function middleware(request) {
     })
   }
 
-  if (!canAccessPath(role, pathname)) {
+  if (!canAccessPath(role, pathname, permissions)) {
     const url = request.nextUrl.clone()
     url.pathname = "/admin"
     url.searchParams.set("denied", pathname)

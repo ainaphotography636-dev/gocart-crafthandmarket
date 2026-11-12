@@ -27,9 +27,9 @@ const ICONS = {
   "/admin/coupons": TicketPercentIcon,
 }
 
-const AdminSidebar = ({ role, adminName = "Crafthand Admin" }) => {
+const AdminSidebar = ({ role, permissions = [], adminName = "Crafthand Admin" }) => {
   const pathname = usePathname()
-  const sidebarLinks = getNavItemsForRole(role)
+  const sidebarLinks = getNavItemsForRole(role, permissions)
 
   return (
     <div className="inline-flex h-full flex-col gap-5 border-r border-slate-200 sm:min-w-64 bg-white/40">

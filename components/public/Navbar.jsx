@@ -11,6 +11,7 @@ import CurrencySwitcher from "@/components/shared/CurrencySwitcher";
 const navLinks = [
     { href: "/", label: "Home" },
     { href: "/shop", label: "Shop" },
+    { href: "/artisans", label: "Artisans" },
     { href: "/create-store", label: "Sell" },
     { href: "/pricing", label: "Pricing" },
 ]

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { listPendingStores, updateStoreStatus } from "@/lib/storeRegistry"
 import { notifyStoreEvent } from "@/lib/notifyClient"
+import { syncArtisanToR2 } from "@/lib/artisanDirectory"
 
 export default function AdminApprove() {
     const [stores, setStores] = useState([])
@@ -22,12 +23,30 @@ export default function AdminApprove() {
 
         const event = status === "approved" ? "store_approved" : "store_rejected"
         const notify = await notifyStoreEvent(event, updated)
-        if (notify.skipped) {
-            toast.success(status === "approved" ? "Store approved (email not configured)" : "Store rejected (email not configured)")
+
+        if (status === "approved") {
+            try {
+                await syncArtisanToR2(updated)
+                toast.success(
+                    notify.ok && !notify.skipped
+                        ? "Store approved — profile synced to R2 & artisan emailed"
+                        : "Store approved — artisan profile synced to Cloudflare R2"
+                )
+            } catch {
+                toast.success(
+                    notify.skipped
+                        ? "Store approved (R2/email not fully configured)"
+                        : notify.ok
+                          ? "Store approved — artisan emailed"
+                          : "Store approved"
+                )
+            }
+        } else if (notify.skipped) {
+            toast.success("Store rejected (email not configured)")
         } else if (!notify.ok) {
-            toast.success(status === "approved" ? "Store approved, but email failed" : "Store rejected, but email failed")
+            toast.success("Store rejected, but email failed")
         } else {
-            toast.success(status === "approved" ? "Store approved — artisan emailed" : "Store rejected — artisan emailed")
+            toast.success("Store rejected — artisan emailed")
         }
         return updated
     }

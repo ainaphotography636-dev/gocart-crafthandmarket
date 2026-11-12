@@ -8,6 +8,7 @@ import toast from "react-hot-toast"
 import Loading from "@/components/shared/Loading"
 import { getActiveStore, submitStoreApplication } from "@/lib/storeRegistry"
 import { notifyStoreEvent } from "@/lib/notifyClient"
+import { syncArtisanToR2 } from "@/lib/artisanDirectory"
 
 export default function CreateStore() {
     const router = useRouter()
@@ -52,6 +53,11 @@ export default function CreateStore() {
         e.preventDefault()
         const store = await submitStoreApplication(storeInfo)
         const notify = await notifyStoreEvent("store_submitted", store)
+        try {
+            await syncArtisanToR2(store)
+        } catch {
+            // R2 sync is best-effort until bucket credentials/CORS are ready.
+        }
         setAlreadySubmitted(true)
         setStatus(store.status)
         setMessage(

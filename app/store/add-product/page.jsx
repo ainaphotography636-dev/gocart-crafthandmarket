@@ -125,7 +125,8 @@ export default function StoreAddProduct() {
           <p className="font-medium text-sm">Workshop process video (optional)</p>
         </div>
         <p className="text-xs mt-2 max-w-lg">
-          MP4 / WebM up to 80MB. Requires R2 CORS with PUT allowed for your Vercel domain.
+          MP4 / WebM recommended. Under 4MB uploads through the server; larger files need R2 bucket
+          CORS (PUT) for your Vercel domain.
         </p>
         <label
           htmlFor="product-video"

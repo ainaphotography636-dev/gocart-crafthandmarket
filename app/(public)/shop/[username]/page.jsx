@@ -1,9 +1,9 @@
 'use client'
-import ProductCard from "@/components/ProductCard"
+import ProductCard from "@/components/public/ProductCard"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { MailIcon, MapPinIcon } from "lucide-react"
-import Loading from "@/components/Loading"
+import Loading from "@/components/shared/Loading"
 import Image from "next/image"
 import { dummyStoreData, productDummyData } from "@/assets/assets"
 

@@ -1,14 +1,16 @@
 'use client'
-import BestSelling from "@/components/BestSelling";
-import Hero from "@/components/Hero";
-import Newsletter from "@/components/Newsletter";
-import OurSpecs from "@/components/OurSpec";
-import LatestProducts from "@/components/LatestProducts";
+import BestSelling from "@/components/public/BestSelling";
+import Hero from "@/components/public/Hero";
+import CategoriesMarquee from "@/components/public/CategoriesMarquee";
+import Newsletter from "@/components/public/Newsletter";
+import OurSpecs from "@/components/public/OurSpec";
+import LatestProducts from "@/components/public/LatestProducts";
 
 export default function Home() {
     return (
         <div>
             <Hero />
+            <CategoriesMarquee />
             <LatestProducts />
             <BestSelling />
             <OurSpecs />

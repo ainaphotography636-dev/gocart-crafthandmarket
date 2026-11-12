@@ -1,26 +1,41 @@
 {
-  "name": "gocart",
+  "name": "crafthand-market",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "26.x"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
-    "next": "15.3.5",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "react-redux": "^9.2.0",
-    "react-hot-toast": "^2.5.2",
-    "recharts": "^3.1.2",
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0",
+    "@prisma/client": "^6.19.0",
+    "@reduxjs/toolkit": "^2.8.2",
+    "@tailwindcss/postcss": "^4",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.525.0",
-    "@reduxjs/toolkit": "^2.8.2"
+    "next": "15.5.29",
+    "postcss": "^8.5.3",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
+    "react-hot-toast": "^2.5.2",
+    "react-redux": "^9.2.0",
+    "recharts": "^3.1.2",
+    "tailwindcss": "^4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "@eslint/eslintrc": "^3",
+    "@types/node": "20.17.6",
+    "@types/react": "19.3.0",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.29",
+    "prisma": "^6.19.0",
+    "typescript": "^5.9.3"
   }
 }

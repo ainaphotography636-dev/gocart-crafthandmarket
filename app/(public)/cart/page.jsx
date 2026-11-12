@@ -1,16 +1,19 @@
 'use client'
-import Counter from "@/components/Counter";
-import OrderSummary from "@/components/OrderSummary";
-import PageTitle from "@/components/PageTitle";
+import Counter from "@/components/public/Counter";
+import OrderSummary from "@/components/public/OrderSummary";
+import PageTitle from "@/components/public/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
 import { Trash2Icon } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useCurrency } from "@/components/shared/CurrencyProvider";
+import { formatProductTitle } from "@/lib/productCodes";
 
 export default function Cart() {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
+    const { currency: currencyInfo } = useCurrency();
+    const currency = currencyInfo.symbol;
     
     const { cartItems } = useSelector(state => state.cart);
     const products = useSelector(state => state.product.list);
@@ -73,7 +76,7 @@ export default function Cart() {
                                                 <Image src={item.images[0]} className="h-14 w-auto" alt="" width={45} height={45} />
                                             </div>
                                             <div>
-                                                <p className="max-sm:text-sm">{item.name}</p>
+                                                <p className="max-sm:text-sm">{formatProductTitle(item)}</p>
                                                 <p className="text-xs text-slate-500">{item.category}</p>
                                                 <p>{currency}{item.price}</p>
                                             </div>

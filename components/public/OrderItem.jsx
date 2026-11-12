@@ -5,10 +5,13 @@ import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
 import RatingModal from "./RatingModal";
+import { useCurrency } from "@/components/shared/CurrencyProvider";
+import { formatProductTitle } from "@/lib/productCodes";
 
 const OrderItem = ({ order }) => {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
+    const { currency: currencyInfo } = useCurrency();
+    const currency = currencyInfo.symbol;
     const [ratingModal, setRatingModal] = useState(null);
 
     const { ratings } = useSelector(state => state.rating);
@@ -30,7 +33,7 @@ const OrderItem = ({ order }) => {
                                     />
                                 </div>
                                 <div className="flex flex-col justify-center text-sm">
-                                    <p className="font-medium text-slate-600 text-base">{item.product.name}</p>
+                                    <p className="font-medium text-slate-600 text-base">{formatProductTitle(item.product)}</p>
                                     <p>{currency}{item.price} Qty : {item.quantity} </p>
                                     <p className="mb-1">{new Date(order.createdAt).toDateString()}</p>
                                     <div>

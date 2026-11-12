@@ -1,13 +1,15 @@
 'use client'
 import { dummyAdminDashboardData } from "@/assets/assets"
-import Loading from "@/components/Loading"
-import OrdersAreaChart from "@/components/OrdersAreaChart"
+import Loading from "@/components/shared/Loading"
+import OrdersAreaChart from "@/components/admin/OrdersAreaChart"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StoreIcon, TagsIcon } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useCurrency } from "@/components/shared/CurrencyProvider"
 
 export default function AdminDashboard() {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const { currency: currencyInfo } = useCurrency()
+    const currency = currencyInfo.symbol
 
     const [loading, setLoading] = useState(true)
     const [dashboardData, setDashboardData] = useState({
@@ -38,7 +40,8 @@ export default function AdminDashboard() {
 
     return (
         <div className="text-slate-500">
-            <h1 className="text-2xl">Admin <span className="text-slate-800 font-medium">Dashboard</span></h1>
+            <p className="text-xs uppercase tracking-[0.18em] text-brand-gold">Overview</p>
+            <h1 className="text-2xl mt-1">Analytics <span className="text-slate-800 font-medium">Dashboard</span></h1>
 
             {/* Cards */}
             <div className="flex flex-wrap gap-5 my-10 mt-4">

@@ -10,6 +10,12 @@ const MAX_VIDEO_BYTES = 4 * 1024 * 1024
 export async function POST(request) {
   try {
     const formData = await request.formData()
+    const artisanId = String(
+      formData.get("artisanId") || formData.get("artisanCode") || ""
+    ).slice(0, 80)
+    const productId = String(
+      formData.get("productId") || formData.get("sku") || ""
+    ).slice(0, 120)
     const storeId = String(formData.get("storeId") || "anonymous").slice(0, 80)
     const kindHint = String(formData.get("kind") || "")
     const files = formData
@@ -22,6 +28,15 @@ export async function POST(request) {
     if (files.length > MAX_FILES) {
       return NextResponse.json(
         { ok: false, error: `Upload at most ${MAX_FILES} files at once.` },
+        { status: 400 }
+      )
+    }
+    if (!artisanId || !productId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "artisanId and productId are required for R2 path artisans/{id}/products/{id}/...",
+        },
         { status: 400 }
       )
     }
@@ -69,6 +84,8 @@ export async function POST(request) {
         fileBuffer: buffer,
         contentType: type || (isVideo ? "video/mp4" : "image/jpeg"),
         filename: file.name || (isVideo ? "product.mp4" : "product.jpg"),
+        artisanId,
+        productId,
         storeId,
         kind: isVideo ? "video" : "image",
       })
@@ -77,6 +94,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       ok: true,
+      pathTemplate: `artisans/${artisanId}/products/${productId}/`,
       urls: uploads.map((item) => item.url),
       keys: uploads.map((item) => item.key),
     })

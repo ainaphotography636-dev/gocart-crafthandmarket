@@ -447,10 +447,9 @@ export default function ProductUploadForm({
     }
   }
 
-  const pathPreview =
-    artisanId && productId
-      ? `artisans/${artisanId}/products/${productId}/`
-      : "artisans/{artisanId}/products/{productId}/"
+  const pathPreview = `artisans/${artisanId || "{artisanId}"}/products/${
+    productId || "{productId}"
+  }/`
 
   const showPreview = images.length > 0 || Boolean(video)
 

@@ -302,7 +302,10 @@ export default function ProductUploadForm({
         toast.error(message)
       } finally {
         setBusy(false)
-        if (inputRef.current) inputRef.current.value = ""
+        const input = inputRef.current
+        if (input) {
+          input.value = ""
+        }
       }
     },
     [ensureRouteIds, onComplete]

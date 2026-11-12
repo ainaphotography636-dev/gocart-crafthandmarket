@@ -2,9 +2,12 @@
  * Client-side artisan video compression via ffmpeg.wasm.
  *
  * Install (if missing):
- *   npm install @ffmpeg/ffmpeg @ffmpeg/util
+ *   npm install @ffmpeg/ffmpeg @ffmpeg/util @ffmpeg/core
  *
- * Loads `@ffmpeg/core` WebAssembly from a CDN (blob URLs avoid CORS / COEP issues).
+ * Loads `@ffmpeg/core` WebAssembly from same-origin `/ffmpeg/*` (copied into
+ * `public/ffmpeg`). Requires COOP/COEP headers in `next.config.js` so the
+ * browser can use SharedArrayBuffer for the FFmpeg worker.
+ *
  * Target: 720p HD, libx264 CRF 28 — strips phone-reel bloat while keeping craft detail.
  */
 
@@ -13,12 +16,23 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg"
 import { fetchFile, toBlobURL } from "@ffmpeg/util"
 
-/** Keep in sync with the CDN core revision below. */
+/** Keep in sync with `public/ffmpeg` + `@ffmpeg/core` package version. */
 export const FFMPEG_CORE_VERSION = "0.12.10"
 
-const CORE_CDN_BASES = [
-  `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
-  `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
+/**
+ * Prefer same-origin UMD assets under /ffmpeg (COEP-safe + no relative imports).
+ * CDN UMD builds are blob-URL fallbacks when local assets are missing.
+ */
+const CORE_BASES = [
+  "/ffmpeg",
+  `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/umd`,
+  `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/umd`,
+]
+
+const WORKER_URLS = [
+  "/ffmpeg/worker.js",
+  "https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/814.ffmpeg.js",
+  "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/814.ffmpeg.js",
 ]
 
 /** Compress when over Vercel proxy limits / phone-reel bloat. */
@@ -75,6 +89,12 @@ function outputFileName(file: File) {
   return `${base}-720p.mp4`
 }
 
+async function toAssetURL(url: string, mimeType: string) {
+  // Same-origin /ffmpeg assets can load directly; CDN URLs become blob: URLs.
+  if (url.startsWith("/")) return url
+  return toBlobURL(url, mimeType)
+}
+
 /**
  * Lazily load a single FFmpeg instance (and `@ffmpeg/core` WASM) for this tab.
  */
@@ -97,14 +117,31 @@ export async function loadVideoCompressor(
 
     if (!ffmpeg.loaded) {
       let lastError: unknown
-      for (const baseURL of CORE_CDN_BASES) {
+
+      for (let i = 0; i < CORE_BASES.length; i += 1) {
+        const coreBase = CORE_BASES[i]
+        const workerSource = WORKER_URLS[Math.min(i, WORKER_URLS.length - 1)]
         try {
+          const coreURL = await toAssetURL(
+            `${coreBase}/ffmpeg-core.js`,
+            "text/javascript"
+          )
+          const wasmURL = await toAssetURL(
+            `${coreBase}/ffmpeg-core.wasm`,
+            "application/wasm"
+          )
+          // Blob URL keeps the worker same-origin under COEP require-corp.
+          const classWorkerURL = await toBlobURL(
+            workerSource.startsWith("http")
+              ? workerSource
+              : `${window.location.origin}${workerSource}`,
+            "text/javascript"
+          )
+
           await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-            wasmURL: await toBlobURL(
-              `${baseURL}/ffmpeg-core.wasm`,
-              "application/wasm"
-            ),
+            coreURL,
+            wasmURL,
+            classWorkerURL,
           })
           lastError = null
           break
@@ -112,10 +149,15 @@ export async function loadVideoCompressor(
           lastError = error
         }
       }
+
       if (!ffmpeg.loaded) {
-        throw lastError instanceof Error
-          ? lastError
-          : new Error("Could not load FFmpeg WebAssembly for video compression.")
+        const detail =
+          lastError instanceof Error && lastError.message
+            ? ` (${lastError.message})`
+            : ""
+        throw new Error(
+          `Could not load FFmpeg WebAssembly for video compression${detail}. Ensure COOP/COEP headers are enabled and /ffmpeg assets are reachable.`
+        )
       }
     }
 

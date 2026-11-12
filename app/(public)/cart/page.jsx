@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useCurrency } from "@/components/shared/CurrencyProvider";
+import { formatProductTitle } from "@/lib/productCodes";
 
 export default function Cart() {
 
@@ -75,7 +76,7 @@ export default function Cart() {
                                                 <Image src={item.images[0]} className="h-14 w-auto" alt="" width={45} height={45} />
                                             </div>
                                             <div>
-                                                <p className="max-sm:text-sm">{item.name}</p>
+                                                <p className="max-sm:text-sm">{formatProductTitle(item)}</p>
                                                 <p className="text-xs text-slate-500">{item.category}</p>
                                                 <p>{currency}{item.price}</p>
                                             </div>

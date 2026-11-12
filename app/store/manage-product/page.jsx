@@ -8,6 +8,7 @@ import { useCurrency } from "@/components/shared/CurrencyProvider"
 import { listStoreProducts, toggleProductStock } from "@/lib/productCatalog"
 import { productDummyData } from "@/assets/assets"
 import { ClapperboardIcon } from "lucide-react"
+import { formatProductTitle } from "@/lib/productCodes"
 
 export default function StoreManageProducts() {
   const { currency: currencyInfo } = useCurrency()
@@ -91,8 +92,8 @@ export default function StoreManageProducts() {
                     alt=""
                   />
                   <div>
-                    <p>{product.name}</p>
-                    <p className="text-xs text-slate-400">{product.category}</p>
+                                    <p>{formatProductTitle(product)}</p>
+                                    <p className="text-xs text-slate-400">{product.category}</p>
                   </div>
                 </div>
               </td>

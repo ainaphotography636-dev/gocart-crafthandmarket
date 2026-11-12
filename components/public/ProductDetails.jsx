@@ -8,6 +8,7 @@ import Image from "next/image";
 import Counter from "./Counter";
 import { useDispatch, useSelector } from "react-redux";
 import { useCurrency } from "@/components/shared/CurrencyProvider";
+import { formatProductTitle } from "@/lib/productCodes";
 
 const ProductDetails = ({ product }) => {
 
@@ -43,7 +44,7 @@ const ProductDetails = ({ product }) => {
                 </div>
             </div>
             <div className="flex-1">
-                <h1 className="text-3xl font-semibold text-slate-800">{product.name}</h1>
+                <h1 className="text-3xl font-semibold text-slate-800">{formatProductTitle(product)}</h1>
                 <div className='flex items-center mt-2'>
                     {Array(5).fill('').map((_, index) => (
                         <StarIcon key={index} size={14} className='text-transparent mt-0.5' fill={averageRating >= index + 1 ? "#047857" : "#D1D5DB"} />

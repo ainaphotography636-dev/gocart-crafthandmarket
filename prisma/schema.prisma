@@ -82,6 +82,10 @@ model Product {
   images      String[]
   video       String?
   category    String
+  /// Unique product code linked to the artisan prefix, e.g. ART001-001
+  sku         String          @unique
+  /// Sequential counter used when minting sku under the store's artisanCode
+  skuSequence Int
   /// Geographical Indication tag (e.g. "Channapatna Toys", "Kanchipuram Silk")
   giTag       String?
   /// Primary craft material for inventory filters (e.g. "teak", "brass", "cotton")
@@ -96,6 +100,8 @@ model Product {
   store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
   rating     Rating[]
+
+  @@index([storeId, skuSequence])
 }
 
 // Required for creating an Order: total, userId, storeId, addressId, isPaid, paymentMethod, isCouponUsed, coupon (JSON), orderItems (nested)
@@ -191,6 +197,10 @@ model Store {
   name        String
   description String
   username    String   @unique
+  /// Unique artisan prefix used in product SKUs, e.g. ART001
+  artisanCode String   @unique
+  /// Monotonic counter for the next product sequence under this artisan
+  nextSkuSeq  Int      @default(1)
   address     String
   status      String   @default("pending")
   isActive    Boolean  @default(false)

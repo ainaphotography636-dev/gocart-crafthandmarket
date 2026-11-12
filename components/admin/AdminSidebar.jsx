@@ -18,6 +18,7 @@ import { getNavItemsForRole, ROLE_LABELS } from "@/lib/adminPermissions"
 
 const ICONS = {
   "/admin": BarChart3Icon,
+  "/admin/products": PackageSearchIcon,
   "/admin/catalog": PackageSearchIcon,
   "/admin/stores": StoreIcon,
   "/admin/approve": ShieldCheckIcon,

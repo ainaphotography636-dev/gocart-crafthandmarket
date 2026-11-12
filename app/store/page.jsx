@@ -4,6 +4,7 @@ import Loading from "@/components/shared/Loading"
 import { useCurrency } from "@/components/shared/CurrencyProvider"
 import { getActiveStore } from "@/lib/storeRegistry"
 import { getStoreDashboardStats } from "@/lib/productCatalog"
+import { formatProductTitle } from "@/lib/productCodes"
 import {
   CircleDollarSignIcon,
   ClapperboardIcon,
@@ -186,7 +187,7 @@ export default function Dashboard() {
                 </div>
                 <div className="p-4">
                   <p className="text-xs text-brand-gold mb-1">{product.category}</p>
-                  <h3 className="text-slate-800 font-medium">{product.name}</h3>
+                  <h3 className="text-slate-800 font-medium">{formatProductTitle(product)}</h3>
                   <p className="text-sm mt-1 line-clamp-2">{product.description}</p>
                   <div className="flex items-center justify-between mt-3 text-sm">
                     <span className="text-slate-700 font-medium">
@@ -262,7 +263,9 @@ export default function Dashboard() {
               <div className="flex flex-col justify-between gap-6 sm:items-end">
                 <div className="flex flex-col sm:items-end">
                   <p className="text-slate-400">{review.product?.category}</p>
-                  <p className="font-medium">{review.product?.name}</p>
+                  <p className="font-medium">
+                    {review.product ? formatProductTitle(review.product) : ""}
+                  </p>
                   <div className="flex items-center">
                     {Array(5)
                       .fill("")

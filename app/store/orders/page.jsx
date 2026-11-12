@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import Loading from "@/components/shared/Loading"
 import { orderDummyData } from "@/assets/assets"
+import { formatProductTitle } from "@/lib/productCodes"
 
 export default function StoreOrders() {
     const [orders, setOrders] = useState([])
@@ -125,7 +126,9 @@ export default function StoreOrders() {
                                             className="w-16 h-16 object-cover rounded"
                                         />
                                         <div className="flex-1">
-                                            <p className="text-slate-800">{item.product?.name}</p>
+                                            <p className="text-slate-800">
+                                                {item.product ? formatProductTitle(item.product) : ""}
+                                            </p>
                                             <p>Qty: {item.quantity}</p>
                                             <p>Price: ${item.price}</p>
                                         </div>

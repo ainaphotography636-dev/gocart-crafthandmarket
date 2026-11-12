@@ -11,6 +11,7 @@ import {
 } from "@/lib/productCatalog"
 import { setProduct } from "@/lib/features/product/productSlice"
 import { ClapperboardIcon } from "lucide-react"
+import { formatProductTitle } from "@/lib/productCodes"
 
 export default function StoreAddProduct() {
   const dispatch = useDispatch()
@@ -66,12 +67,13 @@ export default function StoreAddProduct() {
       dispatch(setProduct([...storeProducts, ...productDummyData]))
       resetForm()
 
+      const titled = formatProductTitle(product)
       if (uploaded.storage === "r2") {
         return product.video
-          ? `${product.name} added — photos & video saved to Cloudflare R2`
-          : `${product.name} added — images saved to Cloudflare R2`
+          ? `${titled} added — photos & video saved to Cloudflare R2`
+          : `${titled} added — images saved to Cloudflare R2`
       }
-      return `${product.name} saved locally. Connect Cloudflare R2 (with CORS PUT) for cloud media & video.`
+      return `${titled} saved locally. Connect Cloudflare R2 (with CORS PUT) for cloud media & video.`
     } finally {
       setLoading(false)
     }

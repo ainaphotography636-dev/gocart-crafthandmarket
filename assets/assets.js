@@ -45,6 +45,8 @@ export const dummyStoreData = {
     name: "Happy Shop",
     description: "At Happy Shop, we believe shopping should be simple, smart, and satisfying. Whether you're hunting for the latest fashion trends, top-notch electronics, home essentials, or unique lifestyle products — we've got it all under one digital roof.",
     username: "happyshop",
+    artisanCode: "ART001",
+    nextSkuSeq: 13,
     address: "3rd Floor, Happy Shop , New Building, 123 street , c sector , NY, US",
     status: "approved",
     isActive: true,
@@ -64,6 +66,8 @@ export const dummyStoreData = {
 export const productDummyData = [
     {
         id: "prod_1",
+        sku: "ART001-001",
+        artisanCode: "ART001",
         name: "Modern table lamp",
         description: "Modern table lamp with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty. Enhance your audio experience with this earbuds. Indulge yourself in a world of pure sound with 50 hours of uninterrupted playtime. Equipped with the cutting-edge Zen Mode Tech ENC and BoomX Tech, prepare to be enthralled by a symphony of crystal-clear melodies.",
         mrp: 40,
@@ -79,6 +83,8 @@ export const productDummyData = [
     },
     {
         id: "prod_2",
+        sku: "ART001-002",
+        artisanCode: "ART001",
         name: "Smart speaker gray",
         description: "Smart speaker with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 50,
@@ -94,6 +100,8 @@ export const productDummyData = [
     },
     {
         id: "prod_3",
+        sku: "ART001-003",
+        artisanCode: "ART001",
         name: "Smart watch white",
         description: "Smart watch with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 60,
@@ -109,6 +117,8 @@ export const productDummyData = [
     },
     {
         id: "prod_4",
+        sku: "ART001-004",
+        artisanCode: "ART001",
         name: "Wireless headphones",
         description: "Wireless headphones with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 70,
@@ -124,6 +134,8 @@ export const productDummyData = [
     },
     {
         id: "prod_5",
+        sku: "ART001-005",
+        artisanCode: "ART001",
         name: "Smart watch black",
         description: "Smart watch with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 49,
@@ -139,6 +151,8 @@ export const productDummyData = [
     },
     {
         id: "prod_6",
+        sku: "ART001-006",
+        artisanCode: "ART001",
         name: "Security Camera",
         description: "Security Camera with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 59,
@@ -154,6 +168,8 @@ export const productDummyData = [
     },
     {
         id: "prod_7",
+        sku: "ART001-007",
+        artisanCode: "ART001",
         name: "Smart Pen for iPad",
         description: "Smart Pen for iPad with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 89,
@@ -169,6 +185,8 @@ export const productDummyData = [
     },
     {
         id: "prod_8",
+        sku: "ART001-008",
+        artisanCode: "ART001",
         name: "Home Theater",
         description: "Home Theater with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 99,
@@ -184,6 +202,8 @@ export const productDummyData = [
     },
     {
         id: "prod_9",
+        sku: "ART001-009",
+        artisanCode: "ART001",
         name: "Apple Wireless Earbuds",
         description: "Apple Wireless Earbuds with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 89,
@@ -199,6 +219,8 @@ export const productDummyData = [
     },
     {
         id: "prod_10",
+        sku: "ART001-010",
+        artisanCode: "ART001",
         name: "Apple Smart Watch",
         description: "Apple Smart Watch with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 179,
@@ -214,6 +236,8 @@ export const productDummyData = [
     },
     {
         id: "prod_11",
+        sku: "ART001-011",
+        artisanCode: "ART001",
         name: "RGB Gaming Mouse",
         description: "RGB Gaming Mouse with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 39,
@@ -229,6 +253,8 @@ export const productDummyData = [
     },
     {
         id: "prod_12",
+        sku: "ART001-012",
+        artisanCode: "ART001",
         name: "Smart Home Cleaner",
         description: "Smart Home Cleaner with a sleek design. It's perfect for any room. It's made of high-quality materials and comes with a lifetime warranty.",
         mrp: 199,

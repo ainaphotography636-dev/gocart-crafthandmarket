@@ -2,12 +2,15 @@
 import { useEffect, useState } from "react"
 import Loading from "@/components/shared/Loading"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
 import { getActiveStore } from "@/lib/storeRegistry"
 
 const StoreLayout = ({ children }) => {
+    const pathname = usePathname()
+    const isLoginRoute = pathname === "/store/login"
     const [isSeller, setIsSeller] = useState(false)
     const [loading, setLoading] = useState(true)
     const [storeInfo, setStoreInfo] = useState(null)
@@ -33,7 +36,11 @@ const StoreLayout = ({ children }) => {
 
     useEffect(() => {
         fetchIsSeller()
-    }, [])
+    }, [pathname])
+
+    if (isLoginRoute) {
+        return children
+    }
 
     return loading ? (
         <Loading />
@@ -59,14 +66,20 @@ const StoreLayout = ({ children }) => {
             <p className="mt-4 max-w-xl text-slate-500">
                 {status === "pending"
                     ? "Ask an admin to approve your application at /admin/approve, then return here."
-                    : "Register your Kerala workshop from the create-store page to start selling on Crafthand Market."}
+                    : "Register your Kerala workshop, or enter an approved profile to open your dashboard."}
             </p>
             <div className="flex flex-wrap gap-3 mt-8 justify-center">
                 <Link
-                    href="/create-store"
+                    href="/store/login"
                     className="bg-brand-emerald text-white flex items-center gap-2 p-2 px-6 max-sm:text-sm rounded-full"
                 >
-                    Register workshop <ArrowRightIcon size={18} />
+                    Enter workshop <ArrowRightIcon size={18} />
+                </Link>
+                <Link
+                    href="/create-store"
+                    className="border border-brand-emerald/40 text-brand-emerald flex items-center gap-2 p-2 px-6 max-sm:text-sm rounded-full"
+                >
+                    Register workshop
                 </Link>
                 {status === "pending" && (
                     <Link

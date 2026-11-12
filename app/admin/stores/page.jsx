@@ -1,17 +1,28 @@
 'use client'
 import StoreInfo from "@/components/admin/StoreInfo"
 import Loading from "@/components/shared/Loading"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
+  enterArtisanSession,
   listLiveStores,
   listStores,
   toggleStoreActive,
 } from "@/lib/storeRegistry"
 import { fetchArtisanDirectory, syncArtisanToR2 } from "@/lib/artisanDirectory"
 
+function isApprovedArtisan(artisan) {
+  if (!artisan) return false
+  if (artisan.source === "demo") return false
+  if (artisan.status && artisan.status !== "approved") return false
+  if (artisan.isActive === false) return false
+  return true
+}
+
 export default function AdminStores() {
+  const router = useRouter()
   const [stores, setStores] = useState([])
   const [artisans, setArtisans] = useState([])
   const [meta, setMeta] = useState({ r2Configured: false, r2Count: 0, source: "local" })
@@ -33,8 +44,36 @@ export default function AdminStores() {
     setLoading(false)
   }
 
+  const approvedDirectory = useMemo(
+    () => artisans.filter(isApprovedArtisan),
+    [artisans]
+  )
+
+  // Merge local approved stores with directory-approved profiles for the Live section.
+  const liveApproved = useMemo(() => {
+    const byKey = new Map()
+    stores.forEach((store) => {
+      byKey.set(store.artisanCode || store.username || store.id, {
+        ...store,
+        source: "local",
+      })
+    })
+    approvedDirectory.forEach((artisan) => {
+      const key = artisan.artisanCode || artisan.username || artisan.id
+      if (!byKey.has(key)) {
+        byKey.set(key, artisan)
+      }
+    })
+    return [...byKey.values()].sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""))
+    )
+  }, [stores, approvedDirectory])
+
   const toggleIsActive = async (storeId) => {
     const current = stores.find((store) => store.id === storeId)
+    if (!current) {
+      throw new Error("Activate/toggle is only available for locally registered stores.")
+    }
     const updated = toggleStoreActive(storeId, !current?.isActive)
     if (!updated) throw new Error("Store not found")
     if (updated.isActive) {
@@ -62,7 +101,9 @@ export default function AdminStores() {
   }
 
   const syncAll = async () => {
-    const targets = stores.length ? stores : artisans.filter((a) => a.source !== "demo")
+    const targets = liveApproved.length
+      ? liveApproved
+      : artisans.filter((a) => a.source !== "demo")
     if (!targets.length) {
       toast.error("No artisan stores to sync")
       return
@@ -79,6 +120,20 @@ export default function AdminStores() {
     }
     toast.success(`Synced ${ok}/${targets.length} profiles to R2`, { id: "sync-all" })
     await fetchStores()
+  }
+
+  const openAsArtisan = (artisan) => {
+    try {
+      const store = enterArtisanSession({
+        ...artisan,
+        status: "approved",
+        isActive: true,
+      })
+      toast.success(`Entered @${store.username} workshop session`)
+      router.push("/store")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not enter workshop")
+    }
   }
 
   useEffect(() => {
@@ -100,6 +155,7 @@ export default function AdminStores() {
           <p className="text-xs mt-2">
             Source: {meta.source}
             {meta.r2Configured ? ` · ${meta.r2Count} on R2` : " · R2 not configured"}
+            {` · ${liveApproved.length} approved`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -108,6 +164,12 @@ export default function AdminStores() {
             className="text-sm border border-slate-200 px-3 py-2 rounded-md hover:bg-white"
           >
             Public artisan directory
+          </Link>
+          <Link
+            href="/store/login"
+            className="text-sm border border-brand-emerald/30 text-brand-emerald px-3 py-2 rounded-md"
+          >
+            Artisan login
           </Link>
           <button
             type="button"
@@ -119,46 +181,74 @@ export default function AdminStores() {
         </div>
       </div>
 
-      <h2 className="text-lg text-slate-800 font-medium mt-10">Live / approved stores</h2>
-      {stores.length ? (
+      <h2 className="text-lg text-slate-800 font-medium mt-10">
+        Live / approved artisan profiles
+      </h2>
+      <p className="text-xs mt-1 text-slate-400">
+        Local approvals plus R2 profiles marked approved (demo stores excluded).
+      </p>
+      {liveApproved.length ? (
         <div className="flex flex-col gap-4 mt-4">
-          {stores.map((store) => (
-            <div
-              key={store.id}
-              className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 flex max-md:flex-col gap-4 md:items-end max-w-4xl"
-            >
-              <StoreInfo store={store} />
-              <div className="flex items-center gap-3 pt-2 flex-wrap">
-                <p>Active</p>
-                <label className="relative inline-flex items-center cursor-pointer text-gray-900">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    onChange={() =>
-                      toast.promise(toggleIsActive(store.id), {
-                        loading: "Updating store...",
-                      })
-                    }
-                    checked={store.isActive}
-                  />
-                  <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-brand-emerald transition-colors duration-200"></div>
-                  <span className="dot absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></span>
-                </label>
-                <button
-                  type="button"
-                  disabled={syncingId === store.id}
-                  onClick={() => syncOne(store)}
-                  className="text-xs border border-brand-emerald/30 text-brand-emerald px-3 py-1.5 rounded-md disabled:opacity-50"
-                >
-                  Sync to R2
-                </button>
+          {liveApproved.map((store) => {
+            const isLocal = Boolean(stores.find((item) => item.id === store.id))
+            return (
+              <div
+                key={store.id || store.artisanCode}
+                className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 flex max-md:flex-col gap-4 md:items-end max-w-4xl"
+              >
+                <StoreInfo store={store} />
+                <div className="flex items-center gap-3 pt-2 flex-wrap">
+                  <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
+                    {store.source || (isLocal ? "local" : "directory")}
+                  </span>
+                  {isLocal ? (
+                    <>
+                      <p>Active</p>
+                      <label className="relative inline-flex items-center cursor-pointer text-gray-900">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          onChange={() =>
+                            toast.promise(toggleIsActive(store.id), {
+                              loading: "Updating store...",
+                            })
+                          }
+                          checked={store.isActive}
+                        />
+                        <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-brand-emerald transition-colors duration-200"></div>
+                        <span className="dot absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></span>
+                      </label>
+                    </>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={syncingId === (store.id || store.artisanCode)}
+                    onClick={() => syncOne(store)}
+                    className="text-xs border border-brand-emerald/30 text-brand-emerald px-3 py-1.5 rounded-md disabled:opacity-50"
+                  >
+                    Sync to R2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAsArtisan(store)}
+                    className="text-xs bg-brand-emerald text-white px-3 py-1.5 rounded-md hover:bg-brand-amber"
+                  >
+                    Enter as artisan
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex flex-col items-center justify-center h-40 gap-2">
           <h1 className="text-2xl text-slate-400 font-medium">No approved stores yet</h1>
+          <p className="text-sm text-slate-400">
+            Approve applications at{" "}
+            <Link href="/admin/approve" className="text-brand-emerald hover:underline">
+              /admin/approve
+            </Link>
+          </p>
         </div>
       )}
 
@@ -175,9 +265,14 @@ export default function AdminStores() {
                 <h3 className="text-slate-800 font-medium mt-1">{artisan.name}</h3>
                 <p className="text-xs text-slate-400 mt-1">@{artisan.username}</p>
               </div>
-              <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
-                {artisan.source}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
+                  {artisan.source}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {artisan.status || "approved"}
+                </span>
+              </div>
             </div>
             <p className="text-sm mt-3 line-clamp-2">{artisan.description}</p>
             <div className="flex flex-wrap gap-2 mt-4">
@@ -197,6 +292,15 @@ export default function AdminStores() {
               >
                 Sync profile
               </button>
+              {isApprovedArtisan(artisan) ? (
+                <button
+                  type="button"
+                  onClick={() => openAsArtisan(artisan)}
+                  className="text-xs border border-brand-emerald/30 text-brand-emerald px-2 py-1 rounded"
+                >
+                  Enter as artisan
+                </button>
+              ) : null}
             </div>
           </div>
         ))}

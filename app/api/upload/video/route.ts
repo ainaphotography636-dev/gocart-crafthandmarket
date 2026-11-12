@@ -4,16 +4,15 @@ import { isR2Configured, uploadProductMediaToR2 } from "@/lib/r2"
 export const runtime = "nodejs"
 
 /**
- * Dedicated workshop video upload.
+ * Dedicated workshop video upload (server proxy).
  *
- * Size choice: 25MB — slightly above the shared product-media /api/upload proxy
- * cap (4MB) so a client can POST a single compressed clip without switching to
- * presign, while still rejecting multi-hundred-MB phone reels. Prefer
- * `lib/video-compressor` client-side first for large sources.
+ * Keep this under typical Vercel serverless body limits (~4.5MB on Hobby).
+ * Larger compressed clips must use `/api/upload/presign` (see
+ * `lib/compressAndUploadVideo.ts`). Prefer client-side FFmpeg compression first.
  *
  * Object key: artisans/{artisanId}/products/{productId}/{timestamp}-{filename}
  */
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024
+const MAX_VIDEO_BYTES = 4 * 1024 * 1024
 
 const ALLOWED_VIDEO_TYPES = new Set([
   "video/mp4",

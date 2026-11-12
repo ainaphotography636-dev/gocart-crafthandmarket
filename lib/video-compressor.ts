@@ -16,10 +16,13 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util"
 /** Keep in sync with the CDN core revision below. */
 export const FFMPEG_CORE_VERSION = "0.12.10"
 
-const CORE_BASE_URL = `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`
+const CORE_CDN_BASES = [
+  `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
+  `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
+]
 
-/** Compress when the source is larger than this (typical phone reel). */
-export const COMPRESS_THRESHOLD_BYTES = 8 * 1024 * 1024
+/** Compress when over Vercel proxy limits / phone-reel bloat. */
+export const COMPRESS_THRESHOLD_BYTES = Math.round(3.5 * 1024 * 1024)
 
 /** Soft ceiling for raw phone reels before compression. */
 export const MAX_SOURCE_VIDEO_BYTES = 250 * 1024 * 1024
@@ -93,13 +96,27 @@ export async function loadVideoCompressor(
     ffmpegSingleton = ffmpeg
 
     if (!ffmpeg.loaded) {
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(
-          `${CORE_BASE_URL}/ffmpeg-core.wasm`,
-          "application/wasm"
-        ),
-      })
+      let lastError: unknown
+      for (const baseURL of CORE_CDN_BASES) {
+        try {
+          await ffmpeg.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+            wasmURL: await toBlobURL(
+              `${baseURL}/ffmpeg-core.wasm`,
+              "application/wasm"
+            ),
+          })
+          lastError = null
+          break
+        } catch (error) {
+          lastError = error
+        }
+      }
+      if (!ffmpeg.loaded) {
+        throw lastError instanceof Error
+          ? lastError
+          : new Error("Could not load FFmpeg WebAssembly for video compression.")
+      }
     }
 
     return ffmpeg

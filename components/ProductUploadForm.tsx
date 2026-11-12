@@ -294,11 +294,11 @@ export default function ProductUploadForm({
       } catch (err) {
         const message = err instanceof Error ? err.message : "Upload failed."
         setError(message)
-        setProgress({
-          percent: 0,
+        setProgress((prev) => ({
+          percent: prev?.stage === "error" ? prev.percent : prev?.percent || 0,
           stage: "error",
           message,
-        })
+        }))
         toast.error(message)
       } finally {
         setBusy(false)
@@ -481,7 +481,8 @@ export default function ProductUploadForm({
           Product media
         </h2>
         <p className="text-sm mt-1 text-slate-500">
-          Images up to 5MB each. Videos up to 200MB (compressed client-side to ~720p).
+          Images up to 5MB each. Videos up to 200MB — compressed to ~720p in your browser,
+          then uploaded to Cloudflare R2.
         </p>
 
         <div

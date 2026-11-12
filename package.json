@@ -7,13 +7,15 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
+    "@prisma/client": "^6.19.0",
     "@reduxjs/toolkit": "^2.8.2",
     "@tailwindcss/postcss": "^4",
     "date-fns": "^4.1.0",
@@ -29,7 +31,11 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/node": "20.17.6",
+    "@types/react": "19.3.0",
     "eslint": "^9",
-    "eslint-config-next": "15.5.29"
+    "eslint-config-next": "15.5.29",
+    "prisma": "^6.19.0",
+    "typescript": "^5.9.3"
   }
 }

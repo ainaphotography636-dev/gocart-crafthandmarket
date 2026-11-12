@@ -1,23 +1,11 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-}
-
-/// Platform staff roles for the Crafthand Market admin console.
-/// Hierarchy (highest → lowest):
-/// SUPER_ADMIN (locked, exactly one founder) → MAIN_ADMIN → OPERATIONS → ARTISAN_LEAD → B2B_TRADE
-enum AdminRole {
-  SUPER_ADMIN
-  MAIN_ADMIN
-  OPERATIONS
-  ARTISAN_LEAD
-  B2B_TRADE
 }
 
 enum ProductQcStatus {
@@ -58,13 +46,15 @@ enum B2BInquiryStatus {
 
 // Required for creating a User: id, name, email, image, cart (optional JSON string)
 model User {
-  id    String    @id
+  id    String @id
   name  String
   email String
   image String
-  cart  Json      @default("{}")
-  /// Admin console role. Null means regular buyer/artisan (no admin access).
-  role  AdminRole?
+  cart  Json   @default("{}")
+  /// Staff/admin role string.
+  /// MEMBER = regular buyer/artisan (default).
+  /// Admin hierarchy: SUPER_ADMIN (exactly one founder) → MAIN_ADMIN → OPERATIONS → ARTISAN_LEAD → B2B_TRADE
+  role String @default("MEMBER")
   /// Granular module grants for non-super-admin staff (e.g. admin.catalog).
   /// SUPER_ADMIN always resolves to ["*"] and must not be customized.
   /// Empty array means "use the default grants for `role`".

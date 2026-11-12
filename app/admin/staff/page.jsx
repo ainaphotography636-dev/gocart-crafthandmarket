@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { LockIcon, PencilIcon, ShieldIcon } from "lucide-react"
 import {
@@ -16,24 +16,103 @@ import {
 } from "@/lib/adminPermissions"
 import { setClientAdminSession } from "@/lib/adminSession"
 import { listStaffMembers, updateStaffMember } from "@/lib/staffRegistry"
-import { persistStaffRoleUpdate } from "@/app/admin/staff/actions"
+import {
+  listStaffUsers,
+  updateStaffRoleAndPermissions,
+} from "@/app/actions/staff"
 
 export default function AdminStaffPage() {
   const [staff, setStaff] = useState([])
+  const [source, setSource] = useState("local")
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState("")
   const [editingId, setEditingId] = useState(null)
   const [draftRole, setDraftRole] = useState(AdminRole.MAIN_ADMIN)
   const [draftPermissions, setDraftPermissions] = useState([])
 
-  const refresh = () => setStaff(listStaffMembers())
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    const remote = await listStaffUsers()
+    if (remote.ok && remote.staff.length) {
+      setStaff(remote.staff)
+      setSource("prisma")
+    } else {
+      setStaff(listStaffMembers())
+      setSource("local")
+    }
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
     refresh()
-  }, [])
+  }, [refresh])
 
   const editingMember = useMemo(
     () => staff.find((member) => member.id === editingId) || null,
     [staff, editingId]
   )
+
+  const applyLocalUpdate = (userId, newRole, newPermissions) => {
+    const updated = updateStaffMember(userId, {
+      role: newRole,
+      permissions: newPermissions,
+    })
+    setStaff(listStaffMembers())
+    return updated
+  }
+
+  const persistChange = async (userId, newRole, newPermissions, { closeModal = false } = {}) => {
+    setSavingId(userId)
+    try {
+      const result = await updateStaffRoleAndPermissions({
+        userId,
+        newRole,
+        newPermissions,
+      })
+
+      if (result.ok && result.staff) {
+        setStaff((prev) =>
+          prev.map((member) => (member.id === userId ? result.staff : member))
+        )
+        setSource("prisma")
+        if (closeModal) setEditingId(null)
+        toast.success("Staff access saved")
+        return result.staff
+      }
+
+      if (result.code === "DB_UNAVAILABLE") {
+        const defaults = getPermissionsForRole(newRole)
+        const sameAsDefaults =
+          defaults.length === newPermissions.length &&
+          defaults.every((permission) => newPermissions.includes(permission))
+        const updated = applyLocalUpdate(
+          userId,
+          newRole,
+          sameAsDefaults ? [] : newPermissions
+        )
+        setSource("local")
+        if (closeModal) setEditingId(null)
+        toast.success("Saved locally (connect DATABASE_URL to persist in Prisma)")
+        return updated
+      }
+
+      toast.error(result.error || "Could not update staff member.")
+      return null
+    } catch (error) {
+      toast.error(error?.message || "Could not update staff member.")
+      return null
+    } finally {
+      setSavingId("")
+    }
+  }
+
+  const onInlineRoleChange = async (member, newRole) => {
+    if (member.role === AdminRole.SUPER_ADMIN || member.isFounder) {
+      toast.error("Super Admin is locked.")
+      return
+    }
+    await persistChange(member.id, newRole, getPermissionsForRole(newRole))
+  }
 
   const openEditor = (member) => {
     if (member.role === AdminRole.SUPER_ADMIN || member.isFounder) {
@@ -49,9 +128,7 @@ export default function AdminStaffPage() {
     )
   }
 
-  const closeEditor = () => {
-    setEditingId(null)
-  }
+  const closeEditor = () => setEditingId(null)
 
   const togglePermission = (permission) => {
     setDraftPermissions((prev) =>
@@ -68,36 +145,9 @@ export default function AdminStaffPage() {
 
   const saveEditor = async () => {
     if (!editingMember) return
-    try {
-      const server = await persistStaffRoleUpdate({
-        userId: editingMember.id,
-        currentRole: editingMember.role,
-        isFounder: editingMember.isFounder,
-        nextRole: draftRole,
-        nextPermissions: draftPermissions,
-        existingSuperAdminCount: staff.filter((m) => m.role === AdminRole.SUPER_ADMIN).length,
-      })
-      if (!server.ok) {
-        toast.error(server.error || "Could not update staff member.")
-        return
-      }
-
-      const defaults = getPermissionsForRole(draftRole)
-      const sameAsDefaults =
-        defaults.length === draftPermissions.length &&
-        defaults.every((permission) => draftPermissions.includes(permission))
-
-      updateStaffMember(editingMember.id, {
-        role: draftRole,
-        // Empty array = inherit role defaults in Prisma/User.permissions
-        permissions: sameAsDefaults ? [] : draftPermissions,
-      })
-      refresh()
-      closeEditor()
-      toast.success("Staff role & module permissions updated")
-    } catch (error) {
-      toast.error(error?.message || "Could not update staff member.")
-    }
+    await persistChange(editingMember.id, draftRole, draftPermissions, {
+      closeModal: true,
+    })
   }
 
   const previewAs = (member) => {
@@ -106,7 +156,7 @@ export default function AdminStaffPage() {
       role: member.role,
       permissions: effective.includes("*") ? [] : effective,
     })
-    toast.success(`Previewing as ${member.name} (${ROLE_LABELS[member.role]})`)
+    toast.success(`Sidebar preview: ${member.name} (${ROLE_LABELS[member.role] || member.role})`)
     window.location.href = "/admin"
   }
 
@@ -117,9 +167,14 @@ export default function AdminStaffPage() {
         Staff & <span className="text-slate-800 font-medium">Role Permissions</span>
       </h1>
       <p className="text-sm mt-2 max-w-3xl">
-        Exactly one locked Super Admin (founder) holds full access (<code>*</code>). All other
-        roles are hierarchical and support per-user module toggles stored on{" "}
-        <code className="text-slate-700">User.permissions</code>.
+        Exactly one locked Super Admin (founder) holds full access (<code>*</code>). Role dropdowns
+        and permission toggles call{" "}
+        <code className="text-slate-700">updateStaffRoleAndPermissions</code> and revalidate{" "}
+        <code className="text-slate-700">/admin/staff</code>.
+      </p>
+      <p className="text-xs mt-2">
+        Data source: {source === "prisma" ? "Prisma database" : "Local demo registry"}
+        {loading ? " · loading…" : ""}
       </p>
 
       <div className="mt-6 grid md:grid-cols-5 gap-3">
@@ -164,7 +219,22 @@ export default function AdminStaffPage() {
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-slate-700">{ROLE_LABELS[member.role]}</p>
+                    {locked ? (
+                      <p className="text-slate-700">{ROLE_LABELS[member.role]}</p>
+                    ) : (
+                      <select
+                        value={member.role}
+                        disabled={savingId === member.id}
+                        onChange={(e) => onInlineRoleChange(member, e.target.value)}
+                        className="border border-slate-200 rounded-md px-2 py-1.5 bg-white min-w-[190px]"
+                      >
+                        {ASSIGNABLE_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <p className="text-xs mt-1 text-slate-400">
                       {member.permissions?.length
                         ? "Custom grants"
@@ -191,7 +261,7 @@ export default function AdminStaffPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={locked}
+                        disabled={locked || savingId === member.id}
                         onClick={() => openEditor(member)}
                         className="inline-flex items-center gap-1 text-xs border border-slate-200 px-3 py-1.5 rounded-md disabled:opacity-40 hover:bg-slate-50"
                       >
@@ -241,18 +311,11 @@ export default function AdminStaffPage() {
                   </option>
                 ))}
               </select>
-              <span className="text-xs text-slate-400">
-                Super Admin is excluded — only the founder may hold that role.
-              </span>
             </label>
 
             <div className="mt-5">
               <p className="text-sm text-slate-700 font-medium">Module permissions</p>
-              <p className="text-xs mt-1 mb-3">
-                Toggle modules for this user. Emptying all boxes is not allowed — keep at least
-                overview or pick a role default set.
-              </p>
-              <div className="grid sm:grid-cols-2 gap-2">
+              <div className="grid sm:grid-cols-2 gap-2 mt-3">
                 {CUSTOMIZABLE_PERMISSIONS.map((permission) => {
                   const checked = draftPermissions.includes(permission)
                   return (
@@ -293,7 +356,7 @@ export default function AdminStaffPage() {
               <button
                 type="button"
                 onClick={saveEditor}
-                disabled={!draftPermissions.length}
+                disabled={!draftPermissions.length || savingId === editingMember.id}
                 className="text-sm px-4 py-2 bg-brand-emerald text-white rounded-md disabled:opacity-40 hover:bg-brand-amber transition"
               >
                 Save permissions

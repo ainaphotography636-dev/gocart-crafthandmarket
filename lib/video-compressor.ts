@@ -1,12 +1,11 @@
 /**
- * Client-side artisan video compression via ffmpeg.wasm.
+ * Client-side artisan video compression via ffmpeg.wasm (+ MediaRecorder fallback).
  *
  * Install (if missing):
  *   npm install @ffmpeg/ffmpeg @ffmpeg/util @ffmpeg/core
  *
- * Loads `@ffmpeg/core` WebAssembly from same-origin `/ffmpeg/*` (copied into
- * `public/ffmpeg`). Requires COOP/COEP headers in `next.config.js` so the
- * browser can use SharedArrayBuffer for the FFmpeg worker.
+ * Assets are copied to `/ffmpeg/*` by `scripts/copy-ffmpeg-assets.mjs`.
+ * `next.config.js` must send COOP/COEP so the FFmpeg module worker can run.
  *
  * Target: 720p HD, libx264 CRF 28 — strips phone-reel bloat while keeping craft detail.
  */
@@ -18,22 +17,6 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util"
 
 /** Keep in sync with `public/ffmpeg` + `@ffmpeg/core` package version. */
 export const FFMPEG_CORE_VERSION = "0.12.10"
-
-/**
- * Prefer same-origin UMD assets under /ffmpeg (COEP-safe + no relative imports).
- * CDN UMD builds are blob-URL fallbacks when local assets are missing.
- */
-const CORE_BASES = [
-  "/ffmpeg",
-  `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/umd`,
-  `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/umd`,
-]
-
-const WORKER_URLS = [
-  "/ffmpeg/worker.js",
-  "https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/814.ffmpeg.js",
-  "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/814.ffmpeg.js",
-]
 
 /** Compress when over Vercel proxy limits / phone-reel bloat. */
 export const COMPRESS_THRESHOLD_BYTES = Math.round(3.5 * 1024 * 1024)
@@ -84,19 +67,25 @@ function extensionFor(file: File) {
   return "mp4"
 }
 
-function outputFileName(file: File) {
+function outputFileName(file: File, ext = "mp4") {
   const base = file.name.replace(/\.[^.]+$/, "") || "workshop-video"
-  return `${base}-720p.mp4`
+  return `${base}-720p.${ext}`
 }
 
-async function toAssetURL(url: string, mimeType: string) {
-  // Same-origin /ffmpeg assets can load directly; CDN URLs become blob: URLs.
-  if (url.startsWith("/")) return url
-  return toBlobURL(url, mimeType)
+function absoluteAsset(path: string) {
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("blob:")) {
+    return path
+  }
+  const normalized = path.startsWith("/") ? path : `/${path}`
+  return `${window.location.origin}${normalized}`
 }
 
 /**
  * Lazily load a single FFmpeg instance (and `@ffmpeg/core` WASM) for this tab.
+ *
+ * Important: `classWorkerURL` must be a same-origin /ffmpeg/worker.js URL (not a
+ * blob). The package creates a module worker, and the ESM worker imports
+ * ./const.js + ./errors.js relative to that URL.
  */
 export async function loadVideoCompressor(
   onProgress?: (progress: CompressVideoProgress) => void
@@ -116,47 +105,50 @@ export async function loadVideoCompressor(
     ffmpegSingleton = ffmpeg
 
     if (!ffmpeg.loaded) {
-      let lastError: unknown
+      const coreJs = absoluteAsset("/ffmpeg/ffmpeg-core.js")
+      const coreWasm = absoluteAsset("/ffmpeg/ffmpeg-core.wasm")
+      const workerJs = absoluteAsset("/ffmpeg/worker.js")
 
-      for (let i = 0; i < CORE_BASES.length; i += 1) {
-        const coreBase = CORE_BASES[i]
-        const workerSource = WORKER_URLS[Math.min(i, WORKER_URLS.length - 1)]
-        try {
-          const coreURL = await toAssetURL(
-            `${coreBase}/ffmpeg-core.js`,
-            "text/javascript"
-          )
-          const wasmURL = await toAssetURL(
-            `${coreBase}/ffmpeg-core.wasm`,
-            "application/wasm"
-          )
-          // Blob URL keeps the worker same-origin under COEP require-corp.
-          const classWorkerURL = await toBlobURL(
-            workerSource.startsWith("http")
-              ? workerSource
-              : `${window.location.origin}${workerSource}`,
-            "text/javascript"
-          )
-
-          await ffmpeg.load({
-            coreURL,
-            wasmURL,
-            classWorkerURL,
-          })
-          lastError = null
-          break
-        } catch (error) {
-          lastError = error
-        }
+      // Verify assets are reachable before invoking the worker (clearer errors).
+      const assetChecks = await Promise.all(
+        [coreJs, coreWasm, workerJs].map(async (url) => {
+          try {
+            const response = await fetch(url, { method: "HEAD", cache: "force-cache" })
+            return { url, ok: response.ok, status: response.status }
+          } catch (error) {
+            return {
+              url,
+              ok: false,
+              status: 0,
+              error: error instanceof Error ? error.message : "fetch failed",
+            }
+          }
+        })
+      )
+      const missing = assetChecks.filter((item) => !item.ok)
+      if (missing.length) {
+        throw new Error(
+          `FFmpeg assets missing (${missing
+            .map((item) => `${item.url} → ${item.status || item.error}`)
+            .join(", ")}). Redeploy so /ffmpeg is published.`
+        )
       }
 
-      if (!ffmpeg.loaded) {
+      try {
+        const coreURL = await toBlobURL(coreJs, "text/javascript")
+        const wasmURL = await toBlobURL(coreWasm, "application/wasm")
+
+        await ffmpeg.load({
+          coreURL,
+          wasmURL,
+          // Absolute same-origin URL — do NOT blob this (breaks relative ESM imports).
+          classWorkerURL: workerJs,
+        })
+      } catch (error) {
         const detail =
-          lastError instanceof Error && lastError.message
-            ? ` (${lastError.message})`
-            : ""
+          error instanceof Error && error.message ? ` (${error.message})` : ""
         throw new Error(
-          `Could not load FFmpeg WebAssembly for video compression${detail}. Ensure COOP/COEP headers are enabled and /ffmpeg assets are reachable.`
+          `Could not load FFmpeg WebAssembly for video compression${detail}. Hard-refresh the page after deploy so COOP/COEP headers apply (window.crossOriginIsolated should be true).`
         )
       }
     }
@@ -172,6 +164,139 @@ export async function loadVideoCompressor(
     throw error instanceof Error
       ? error
       : new Error("Could not load FFmpeg WebAssembly for video compression.")
+  }
+}
+
+/**
+ * Browser-native fallback when ffmpeg.wasm cannot load (still downscales to ~720p).
+ * Outputs WebM (VP8/VP9) which R2 + modern browsers accept.
+ */
+async function compressWithMediaRecorder(
+  file: File,
+  {
+    height = 720,
+    onProgress,
+  }: {
+    height?: number
+    onProgress?: (progress: CompressVideoProgress) => void
+  }
+): Promise<CompressVideoResult> {
+  onProgress?.({
+    stage: "loading",
+    message: "Using browser encoder fallback…",
+  })
+
+  const objectUrl = URL.createObjectURL(file)
+  const video = document.createElement("video")
+  video.muted = true
+  video.playsInline = true
+  video.preload = "auto"
+  video.src = objectUrl
+
+  await new Promise<void>((resolve, reject) => {
+    video.onloadedmetadata = () => resolve()
+    video.onerror = () => reject(new Error("Could not read video for fallback compression."))
+  })
+
+  const sourceWidth = video.videoWidth || 1280
+  const sourceHeight = video.videoHeight || 720
+  const targetHeight = Math.min(height, sourceHeight)
+  const targetWidth = Math.max(2, Math.round((sourceWidth / sourceHeight) * targetHeight / 2) * 2)
+
+  const canvas = document.createElement("canvas")
+  canvas.width = targetWidth
+  canvas.height = targetHeight
+  const ctx = canvas.getContext("2d")
+  if (!ctx) {
+    URL.revokeObjectURL(objectUrl)
+    throw new Error("Canvas unavailable for fallback compression.")
+  }
+
+  const stream = canvas.captureStream(30)
+  const audioTracks =
+    // @ts-expect-error captureStream exists on HTMLMediaElement in Chromium
+    typeof video.captureStream === "function"
+      ? // @ts-expect-error captureStream
+        (video.captureStream() as MediaStream).getAudioTracks()
+      : []
+  audioTracks.forEach((track: MediaStreamTrack) => stream.addTrack(track))
+
+  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+    ? "video/webm;codecs=vp9,opus"
+    : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
+      : "video/webm"
+
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: 2_500_000,
+  })
+  const chunks: BlobPart[] = []
+  recorder.ondataavailable = (event) => {
+    if (event.data.size) chunks.push(event.data)
+  }
+
+  const recorded = new Promise<Blob>((resolve, reject) => {
+    recorder.onerror = () => reject(new Error("Browser video encoder failed."))
+    recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }))
+  })
+
+  onProgress?.({
+    stage: "encoding",
+    ratio: 0,
+    message: "Compressing video... 0%",
+  })
+
+  recorder.start(250)
+  await video.play()
+
+  let frameId = 0
+  const draw = () => {
+    if (video.paused || video.ended) return
+    ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
+    const ratio = video.duration > 0 ? Math.min(1, video.currentTime / video.duration) : 0
+    onProgress?.({
+      stage: "encoding",
+      ratio,
+      message: `Compressing video... ${Math.round(ratio * 100)}%`,
+    })
+    frameId = requestAnimationFrame(draw)
+  }
+  draw()
+
+  await new Promise<void>((resolve) => {
+    video.onended = () => resolve()
+  })
+  cancelAnimationFrame(frameId)
+  if (recorder.state !== "inactive") recorder.stop()
+  stream.getTracks().forEach((track) => track.stop())
+  URL.revokeObjectURL(objectUrl)
+
+  onProgress?.({
+    stage: "reading",
+    ratio: 1,
+    message: "Reading compressed video…",
+  })
+
+  const blob = await recorded
+  const compressed = new File([blob], outputFileName(file, "webm"), {
+    type: "video/webm",
+    lastModified: Date.now(),
+  })
+
+  onProgress?.({
+    stage: "done",
+    ratio: 1,
+    message: `Compressed ${formatMb(file.size)} → ${formatMb(compressed.size)} (browser encoder)`,
+  })
+
+  return {
+    file: compressed,
+    blob,
+    originalBytes: file.size,
+    compressedBytes: compressed.size,
+    skipped: false,
+    reason: "mediarecorder-fallback",
   }
 }
 
@@ -223,106 +348,119 @@ export async function compressWorkshopVideo(
     }
   }
 
-  const ffmpeg = await loadVideoCompressor(onProgress)
-
-  const progressHandler = ({ progress }: { progress: number }) => {
-    onProgress?.({
-      stage: "encoding",
-      ratio: Math.min(1, Math.max(0, progress)),
-      message: `Compressing to ${height}p (CRF ${crf})… ${Math.round(Math.min(1, progress) * 100)}%`,
-    })
-  }
-  ffmpeg.on("progress", progressHandler)
-
-  const inputName = `input.${extensionFor(file)}`
-  const outputName = "output.mp4"
-
   try {
-    onProgress?.({
-      stage: "writing",
-      message: "Preparing video for compression…",
-    })
-    await ffmpeg.writeFile(inputName, await fetchFile(file))
+    const ffmpeg = await loadVideoCompressor(onProgress)
 
-    onProgress?.({
-      stage: "encoding",
-      ratio: 0,
-      message: `Compressing to ${height}p (libx264, CRF ${crf})…`,
-    })
-
-    const code = await ffmpeg.exec([
-      "-i",
-      inputName,
-      "-vf",
-      `scale=-2:${height}`,
-      "-c:v",
-      "libx264",
-      "-preset",
-      preset,
-      "-crf",
-      String(crf),
-      "-c:a",
-      "aac",
-      "-b:a",
-      "128k",
-      "-ac",
-      "2",
-      "-movflags",
-      "+faststart",
-      "-y",
-      outputName,
-    ])
-
-    if (code !== 0) {
-      throw new Error(`FFmpeg exited with code ${code}. Try a shorter MP4 clip.`)
+    const progressHandler = ({ progress }: { progress: number }) => {
+      onProgress?.({
+        stage: "encoding",
+        ratio: Math.min(1, Math.max(0, progress)),
+        message: `Compressing video... ${Math.round(Math.min(1, progress) * 100)}%`,
+      })
     }
+    ffmpeg.on("progress", progressHandler)
 
-    onProgress?.({
-      stage: "reading",
-      ratio: 1,
-      message: "Reading compressed video…",
-    })
+    const inputName = `input.${extensionFor(file)}`
+    const outputName = "output.mp4"
 
-    const data = await ffmpeg.readFile(outputName)
-    const bytes =
-      data instanceof Uint8Array
-        ? data
-        : new TextEncoder().encode(String(data))
-    // Copy into a fresh ArrayBuffer so BlobPart typing stays clean under strict DOM libs.
-    const buffer = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength
-    ) as ArrayBuffer
-    const blob = new Blob([buffer], { type: "video/mp4" })
-    const compressed = new File([blob], outputFileName(file), {
-      type: "video/mp4",
-      lastModified: Date.now(),
-    })
-
-    onProgress?.({
-      stage: "done",
-      ratio: 1,
-      message: `Compressed ${formatMb(originalBytes)} → ${formatMb(compressed.size)}`,
-    })
-
-    return {
-      file: compressed,
-      blob,
-      originalBytes,
-      compressedBytes: compressed.size,
-      skipped: false,
-    }
-  } finally {
-    ffmpeg.off("progress", progressHandler)
     try {
-      await ffmpeg.deleteFile(inputName)
-    } catch {
-      // ignore missing input
+      onProgress?.({
+        stage: "writing",
+        message: "Preparing video for compression…",
+      })
+      await ffmpeg.writeFile(inputName, await fetchFile(file))
+
+      onProgress?.({
+        stage: "encoding",
+        ratio: 0,
+        message: `Compressing video... 0%`,
+      })
+
+      const code = await ffmpeg.exec([
+        "-i",
+        inputName,
+        "-vf",
+        `scale=-2:${height}`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        preset,
+        "-crf",
+        String(crf),
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-ac",
+        "2",
+        "-movflags",
+        "+faststart",
+        "-y",
+        outputName,
+      ])
+
+      if (code !== 0) {
+        throw new Error(`FFmpeg exited with code ${code}. Try a shorter MP4 clip.`)
+      }
+
+      onProgress?.({
+        stage: "reading",
+        ratio: 1,
+        message: "Reading compressed video…",
+      })
+
+      const data = await ffmpeg.readFile(outputName)
+      const bytes =
+        data instanceof Uint8Array
+          ? data
+          : new TextEncoder().encode(String(data))
+      const buffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      ) as ArrayBuffer
+      const blob = new Blob([buffer], { type: "video/mp4" })
+      const compressed = new File([blob], outputFileName(file), {
+        type: "video/mp4",
+        lastModified: Date.now(),
+      })
+
+      onProgress?.({
+        stage: "done",
+        ratio: 1,
+        message: `Compressed ${formatMb(originalBytes)} → ${formatMb(compressed.size)}`,
+      })
+
+      return {
+        file: compressed,
+        blob,
+        originalBytes,
+        compressedBytes: compressed.size,
+        skipped: false,
+      }
+    } finally {
+      ffmpeg.off("progress", progressHandler)
+      try {
+        await ffmpeg.deleteFile(inputName)
+      } catch {
+        // ignore
+      }
+      try {
+        await ffmpeg.deleteFile(outputName)
+      } catch {
+        // ignore
+      }
+    }
+  } catch (ffmpegError) {
+    // Fall back to MediaRecorder so artisans can still upload large phone reels.
+    if (typeof MediaRecorder === "undefined") {
+      throw ffmpegError
     }
     try {
-      await ffmpeg.deleteFile(outputName)
+      return await compressWithMediaRecorder(file, { height, onProgress })
     } catch {
-      // ignore missing output
+      throw ffmpegError instanceof Error
+        ? ffmpegError
+        : new Error("Could not load FFmpeg WebAssembly for video compression.")
     }
   }
 }

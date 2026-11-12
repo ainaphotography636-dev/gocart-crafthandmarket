@@ -16,10 +16,12 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // credentialless still enables crossOriginIsolated / SharedArrayBuffer
+        // while allowing cross-origin R2 images that lack CORP headers.
+        source: "/:path*",
         headers: [
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
         ],
       },
       {

@@ -23,8 +23,20 @@ export async function POST(request) {
     const body = await request.json()
     const filename = String(body?.filename || "upload.bin")
     const contentType = String(body?.contentType || "application/octet-stream")
+    const artisanId = String(body?.artisanId || body?.artisanCode || "").slice(0, 80)
+    const productId = String(body?.productId || body?.sku || "").slice(0, 120)
     const storeId = String(body?.storeId || "anonymous").slice(0, 80)
     const kind = body?.kind === "video" ? "video" : "image"
+
+    if (!artisanId || !productId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "artisanId and productId are required for R2 path artisans/{id}/products/{id}/...",
+        },
+        { status: 400 }
+      )
+    }
 
     if (kind === "image" && !ALLOWED_IMAGE.includes(contentType) && !contentType.startsWith("image/")) {
       return NextResponse.json({ ok: false, error: "Unsupported image type." }, { status: 400 })
@@ -36,11 +48,17 @@ export async function POST(request) {
     const signed = await createPresignedProductUpload({
       filename,
       contentType,
+      artisanId,
+      productId,
       storeId,
       kind,
     })
 
-    return NextResponse.json({ ok: true, ...signed })
+    return NextResponse.json({
+      ok: true,
+      pathTemplate: `artisans/${artisanId}/products/${productId}/`,
+      ...signed,
+    })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error?.message || "Could not create upload URL." },

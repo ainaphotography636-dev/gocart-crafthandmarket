@@ -30,7 +30,7 @@ export async function POST(request) {
           ok: false,
           skipped: true,
           error:
-            "Cloudflare R2 is not configured. Add CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID, CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME, and CLOUDFLARE_R2_PUBLIC_URL.",
+            "Cloudflare R2 is not configured. Add the R2 env vars from your old Crafthand Market project (account id, access key, secret, bucket, public URL), then redeploy.",
         },
         { status: 503 }
       )

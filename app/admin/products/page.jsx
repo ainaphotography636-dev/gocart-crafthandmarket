@@ -7,15 +7,10 @@ import { productDummyData } from "@/assets/assets"
 import { listProducts } from "@/lib/productCatalog"
 import { useCurrency } from "@/components/shared/CurrencyProvider"
 import { ensureProductSku, formatProductTitle } from "@/lib/productCodes"
+import { CRAFT_MATERIALS, GI_TAG_OPTIONS } from "@/lib/handicraftCategories"
 
-const GI_TAGS = [
-  "All GI-Tags",
-  "Channapatna Toys",
-  "Kanchipuram Silk",
-  "Aranmula Kannadi",
-  "Kondapalli Toys",
-]
-const MATERIALS = ["All materials", "teak", "brass", "cotton", "silk", "terracotta", "rosewood"]
+const GI_TAGS = ["All GI-Tags", ...GI_TAG_OPTIONS]
+const MATERIALS = ["All materials", ...CRAFT_MATERIALS]
 
 function withDemoTags(products) {
   const giCycle = GI_TAGS.slice(1)

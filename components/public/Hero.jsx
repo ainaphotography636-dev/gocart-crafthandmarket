@@ -1,55 +1,76 @@
 'use client'
-import { assets } from '@/assets/assets'
-import { ArrowRightIcon, ChevronRightIcon } from 'lucide-react'
-import Image from 'next/image'
-import React from 'react'
-import CategoriesMarquee from './CategoriesMarquee'
-import { useCurrency } from '@/components/shared/CurrencyProvider'
+
+import { assets } from "@/assets/assets"
+import Image from "next/image"
+import Link from "next/link"
+import { useEffect, useState } from "react"
 
 const Hero = () => {
+  const [ready, setReady] = useState(false)
 
-    const { currency } = useCurrency()
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setReady(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
-    return (
-        <div className='mx-6'>
-            <div className='flex max-xl:flex-col gap-8 max-w-7xl mx-auto my-10'>
-                <div className='relative flex-1 flex flex-col bg-brand-emerald-soft rounded-3xl xl:min-h-100 group border border-brand-emerald/10'>
-                    <div className='p-5 sm:p-16'>
-                        <div className='inline-flex items-center gap-3 bg-brand-amber-soft text-brand-amber pr-4 p-1 rounded-full text-xs sm:text-sm'>
-                            <span className='bg-brand-emerald px-3 py-1 max-sm:ml-1 rounded-full text-white text-xs'>NEWS</span> Free Shipping on Orders Above {currency.symbol}50! <ChevronRightIcon className='group-hover:ml-2 transition-all' size={16} />
-                        </div>
-                        <h2 className='text-3xl sm:text-5xl leading-[1.2] my-3 font-medium bg-gradient-to-r from-brand-ink to-brand-emerald bg-clip-text text-transparent max-w-xs  sm:max-w-md'>
-                            Artisan pieces you&apos;ll love. Craft you can trust.
-                        </h2>
-                        <div className='text-slate-800 text-sm font-medium mt-4 sm:mt-8'>
-                            <p>Starts from</p>
-                            <p className='text-3xl text-brand-gold'>{currency.symbol}4.90</p>
-                        </div>
-                        <button className='bg-brand-emerald text-white text-sm py-2.5 px-7 sm:py-5 sm:px-12 mt-4 sm:mt-10 rounded-md hover:bg-brand-amber hover:scale-103 active:scale-95 transition'>LEARN MORE</button>
-                    </div>
-                    <Image className='sm:absolute bottom-0 right-0 md:right-10 w-full sm:max-w-sm' src={assets.hero_model_img} alt="" />
-                </div>
-                <div className='flex flex-col md:flex-row xl:flex-col gap-5 w-full xl:max-w-sm text-sm text-slate-600'>
-                    <div className='flex-1 flex items-center justify-between w-full bg-brand-amber-soft rounded-3xl p-6 px-8 group border border-brand-amber/15'>
-                        <div>
-                            <p className='text-3xl font-medium bg-gradient-to-r from-brand-ink to-brand-amber bg-clip-text text-transparent max-w-40'>Best makers</p>
-                            <p className='flex items-center gap-1 mt-4 text-brand-amber'>View more <ArrowRightIcon className='group-hover:ml-2 transition-all' size={18} /> </p>
-                        </div>
-                        <Image className='w-35' src={assets.hero_product_img1} alt="" />
-                    </div>
-                    <div className='flex-1 flex items-center justify-between w-full bg-amber-100/80 rounded-3xl p-6 px-8 group border border-brand-gold/20'>
-                        <div>
-                            <p className='text-3xl font-medium bg-gradient-to-r from-brand-ink to-brand-gold-rich bg-clip-text text-transparent max-w-40'>20% discounts</p>
-                            <p className='flex items-center gap-1 mt-4 text-brand-gold'>View more <ArrowRightIcon className='group-hover:ml-2 transition-all' size={18} /> </p>
-                        </div>
-                        <Image className='w-35' src={assets.hero_product_img2} alt="" />
-                    </div>
-                </div>
-            </div>
-            <CategoriesMarquee />
+  return (
+    <section className="relative isolate min-h-[88vh] w-full overflow-hidden bg-brand-ink text-white">
+      <Image
+        src={assets.hero_model_img}
+        alt="Indian artisan craftsmanship for Crafthand Market"
+        fill
+        priority
+        className={`object-cover transition-transform duration-[1600ms] ease-out ${
+          ready ? "scale-100" : "scale-110"
+        }`}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-brand-ink/90 via-brand-ink/65 to-brand-ink/25" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(180,83,9,0.28),transparent_45%)]" />
+
+      <div className="relative z-10 mx-auto flex min-h-[88vh] max-w-7xl flex-col justify-end px-6 pb-16 pt-28 sm:px-8 sm:pb-20">
+        <p
+          className={`text-xs uppercase tracking-[0.35em] text-brand-gold-light transition-all duration-700 ${
+            ready ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+          }`}
+        >
+          Crafthand Market
+        </p>
+        <h1
+          className={`mt-4 max-w-3xl font-medium text-4xl leading-[1.05] sm:text-6xl transition-all delay-100 duration-700 ${
+            ready ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          }`}
+        >
+          Brass, handlooms, and GI-tag heirlooms from India&apos;s finest ateliers.
+        </h1>
+        <p
+          className={`mt-5 max-w-xl text-sm sm:text-base text-white/80 leading-relaxed transition-all delay-200 duration-700 ${
+            ready ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          }`}
+        >
+          A luxury marketplace for authenticated Indian handicrafts — every piece coded to its
+          artisan workshop.
+        </p>
+        <div
+          className={`mt-8 flex flex-wrap gap-3 transition-all delay-300 duration-700 ${
+            ready ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+          }`}
+        >
+          <Link
+            href="/shop"
+            className="bg-brand-emerald px-6 py-3 text-sm text-white hover:bg-brand-amber transition"
+          >
+            Explore the collection
+          </Link>
+          <Link
+            href="/artisans"
+            className="border border-white/35 px-6 py-3 text-sm text-white hover:bg-white/10 transition"
+          >
+            Meet the artisans
+          </Link>
         </div>
-
-    )
+      </div>
+    </section>
+  )
 }
 
 export default Hero

@@ -1,5 +1,9 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import {
+  getSupabasePublishableKey,
+  getSupabaseUrl,
+} from "@/lib/supabase/config"
 
 /**
  * Refresh the Supabase Auth session on every matched request and return
@@ -10,15 +14,15 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = getSupabaseUrl()
+  const key = getSupabasePublishableKey()
 
   // Allow local/dev builds without Supabase until keys are configured.
-  if (!url || !anonKey) {
+  if (!url || !key) {
     return { supabaseResponse, user: null, supabase: null }
   }
 
-  const supabase = createServerClient(url, anonKey, {
+  const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
         return request.cookies.getAll()

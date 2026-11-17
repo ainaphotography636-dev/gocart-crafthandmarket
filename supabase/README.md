@@ -12,8 +12,10 @@ From **Project Settings → API**:
 | Env var | Where to find it |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` `public` key |
-| `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key (keep secret) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (`sb_publishable_…`) from Connect / API Keys |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret / `service_role` key (keep secret) |
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy alias for the publishable key.
 
 Copy `.env.example` values into `.env.local` and replace the placeholders:
 

@@ -59,6 +59,12 @@ export default function ArtisansPage() {
         </Link>
       </div>
 
+      <div className="mt-6">
+        <Link href="/store/login" className="text-sm text-brand-emerald hover:underline">
+          Already approved? Enter your workshop dashboard →
+        </Link>
+      </div>
+
       {artisans.length ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10">
           {artisans.map((artisan) => (

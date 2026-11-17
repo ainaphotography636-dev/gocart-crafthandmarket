@@ -9,21 +9,39 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase/config"
 import { createClient } from "@/utils/supabase/server"
 
+export type CustomSpec = { key: string; value: string }
+
+export type HandicraftSpecs = {
+  material?: string | null
+  craftTechnique?: string | null
+  dimensions?: string | null
+  weight?: string | null
+  regionOrigin?: string | null
+  careInstructions?: string | null
+  giTag?: string | null
+  custom?: CustomSpec[]
+}
+
 export type MarketplaceProductInput = {
   title: string
   description: string
   category: string
-  priceUsd: number
-  mrpUsd?: number | null
+  /** Offer price in INR */
+  priceInr: number
+  /** Actual / MRP price in INR */
+  mrpInr?: number | null
   images: string[]
   videoProofUrl?: string | null
-  /** Prefer the SKU already used for R2 paths so media and DB stay aligned. */
   sku?: string | null
   workshopName?: string | null
   username?: string | null
   artisanCode?: string | null
-  /** Publish immediately when the artisan workshop is verified + active. */
   publish?: boolean
+  specs?: HandicraftSpecs | null
+  /** @deprecated Prefer priceInr */
+  priceUsd?: number
+  /** @deprecated Prefer mrpInr */
+  mrpUsd?: number | null
 }
 
 export type MarketplaceActionResult =
@@ -66,19 +84,37 @@ function slugifyUsername(value: string) {
     .slice(0, 40)
 }
 
+function normalizeCustomSpecs(custom?: CustomSpec[] | null) {
+  if (!Array.isArray(custom)) return [] as CustomSpec[]
+  return custom
+    .map((row) => ({
+      key: String(row?.key || "").trim(),
+      value: String(row?.value || "").trim(),
+    }))
+    .filter((row) => row.key && row.value)
+}
+
 type ParsedProductInput = {
   title: string
   description: string
   category: string
   images: string[]
-  priceUsd: number
-  mrpUsd: number | null
+  priceInr: number
+  mrpInr: number | null
   videoProofUrl: string | null
   sku: string | null
   workshopName: string | null
   username: string | null
   artisanCode: string | null
   publish: boolean
+  material: string | null
+  craftTechnique: string | null
+  dimensions: string | null
+  weight: string | null
+  regionOrigin: string | null
+  careInstructions: string | null
+  giTag: string | null
+  customSpecs: CustomSpec[]
 }
 
 function validateProductInput(
@@ -90,23 +126,42 @@ function validateProductInput(
   const images = Array.isArray(input.images)
     ? input.images.map((url) => String(url || "").trim()).filter(Boolean)
     : []
-  const priceUsd = Number(input.priceUsd)
-  const mrpUsd =
-    input.mrpUsd === undefined || input.mrpUsd === null
-      ? null
-      : Number(input.mrpUsd)
+  const priceInr = Number(
+    input.priceInr !== undefined ? input.priceInr : input.priceUsd
+  )
+  const mrpRaw =
+    input.mrpInr !== undefined && input.mrpInr !== null
+      ? input.mrpInr
+      : input.mrpUsd
+  const mrpInr =
+    mrpRaw === undefined || mrpRaw === null ? null : Number(mrpRaw)
+  const publish = Boolean(input.publish)
+  const specs = input.specs || {}
 
   if (!title) return { ok: false, error: "Product name is required." }
   if (!description) return { ok: false, error: "Product description is required." }
   if (!category) return { ok: false, error: "Select a category." }
-  if (!images.length) return { ok: false, error: "Add at least one product image." }
-  if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
-    return { ok: false, error: "Enter a valid offer price." }
+
+  if (publish) {
+    if (images.length < 4) {
+      return { ok: false, error: "Publish requires 4–6 product photos." }
+    }
+    if (images.length > 6) {
+      return { ok: false, error: "Upload at most 6 product photos." }
+    }
+  } else if (!images.length) {
+    return { ok: false, error: "Add at least one product photo before saving." }
+  } else if (images.length > 6) {
+    return { ok: false, error: "Upload at most 6 product photos." }
   }
-  if (mrpUsd !== null && (!Number.isFinite(mrpUsd) || mrpUsd <= 0)) {
-    return { ok: false, error: "Enter a valid actual price." }
+
+  if (!Number.isFinite(priceInr) || priceInr <= 0) {
+    return { ok: false, error: "Enter a valid offer price (₹)." }
   }
-  if (mrpUsd !== null && priceUsd > mrpUsd) {
+  if (mrpInr !== null && (!Number.isFinite(mrpInr) || mrpInr <= 0)) {
+    return { ok: false, error: "Enter a valid actual price (₹)." }
+  }
+  if (mrpInr !== null && priceInr > mrpInr) {
     return { ok: false, error: "Offer price cannot be higher than actual price." }
   }
 
@@ -117,22 +172,26 @@ function validateProductInput(
       description,
       category,
       images,
-      priceUsd,
-      mrpUsd,
+      priceInr,
+      mrpInr,
       videoProofUrl: input.videoProofUrl?.trim() || null,
       sku: input.sku?.trim() || null,
       workshopName: input.workshopName?.trim() || null,
       username: input.username?.trim() || null,
       artisanCode: input.artisanCode?.trim() || null,
-      publish: Boolean(input.publish),
+      publish,
+      material: String(specs.material || "").trim() || null,
+      craftTechnique: String(specs.craftTechnique || "").trim() || null,
+      dimensions: String(specs.dimensions || "").trim() || null,
+      weight: String(specs.weight || "").trim() || null,
+      regionOrigin: String(specs.regionOrigin || "").trim() || null,
+      careInstructions: String(specs.careInstructions || "").trim() || null,
+      giTag: String(specs.giTag || "").trim() || null,
+      customSpecs: normalizeCustomSpecs(specs.custom),
     },
   }
 }
 
-/**
- * Ensure the signed-in user has a profiles row + artisans workshop.
- * Creates the workshop on first product publish when missing.
- */
 async function ensureArtisanForUser(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -159,7 +218,6 @@ async function ensureArtisanForUser(
     return { artisan: existingArtisan }
   }
 
-  // Ensure profile exists and is marked artisan (trigger usually creates it).
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id, role, email, full_name")
@@ -207,7 +265,6 @@ async function ensureArtisanForUser(
     username = `atelier-${artisanCode.toLowerCase().slice(0, 8)}`
   }
 
-  // Resolve username collisions with a short numeric suffix.
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const candidate =
       attempt === 0 ? username : `${username.slice(0, 36)}-${attempt + 1}`
@@ -232,7 +289,6 @@ async function ensureArtisanForUser(
       return { artisan: created }
     }
 
-    // Unique violation on username — retry with suffix.
     if (createError?.code === "23505" && /username/i.test(createError.message)) {
       continue
     }
@@ -243,8 +299,7 @@ async function ensureArtisanForUser(
 }
 
 /**
- * Persist a product to Supabase `public.products` for the signed-in artisan.
- * Falls back with SUPABASE_UNAVAILABLE when Auth env is not configured.
+ * Persist a product to Supabase for the signed-in artisan (INR + handicraft specs).
  */
 export async function createMarketplaceProduct(
   input: MarketplaceProductInput
@@ -310,7 +365,6 @@ export async function createMarketplaceProduct(
     sku = minted.sku
     nextSkuSeq = minted.nextSkuSeq
   } else {
-    // Keep sequence cursor ahead of any client-claimed SKU.
     const match = sku.match(/-(\d+)$/)
     const seq = match ? Number(match[1]) : null
     if (seq && Number.isFinite(seq)) {
@@ -323,6 +377,17 @@ export async function createMarketplaceProduct(
     artisan.verification_status === "verified" &&
     artisan.is_active === true
 
+  const specsPayload = {
+    material: parsed.material,
+    craftTechnique: parsed.craftTechnique,
+    dimensions: parsed.dimensions,
+    weight: parsed.weight,
+    regionOrigin: parsed.regionOrigin,
+    careInstructions: parsed.careInstructions,
+    giTag: parsed.giTag,
+    custom: parsed.customSpecs,
+  }
+
   const { data: product, error: insertError } = await supabase
     .from("products")
     .insert({
@@ -330,10 +395,21 @@ export async function createMarketplaceProduct(
       title: parsed.title,
       description: parsed.description,
       category: parsed.category,
+      material: parsed.material,
+      gi_tag: parsed.giTag,
+      craft_technique: parsed.craftTechnique,
+      dimensions: parsed.dimensions,
+      weight: parsed.weight,
+      region_origin: parsed.regionOrigin,
+      care_instructions: parsed.careInstructions,
+      specs: specsPayload,
       sku,
-      price_usd: parsed.priceUsd,
-      mrp_usd: parsed.mrpUsd,
-      currency_default: "USD",
+      // INR is the marketplace currency; keep price_usd populated for legacy readers.
+      price_inr: parsed.priceInr,
+      mrp_inr: parsed.mrpInr,
+      price_usd: parsed.priceInr,
+      mrp_usd: parsed.mrpInr,
+      currency_default: "INR",
       images: parsed.images,
       video_proof_url: parsed.videoProofUrl,
       in_stock: true,
@@ -350,7 +426,6 @@ export async function createMarketplaceProduct(
     }
   }
 
-  // Advance SKU sequence (best-effort; product row already committed).
   if (nextSkuSeq !== artisan.next_sku_seq) {
     await supabase
       .from("artisans")

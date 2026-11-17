@@ -27,6 +27,12 @@ export type StorefrontProduct = {
   category: string
   material: string | null
   giTag: string | null
+  craftTechnique?: string | null
+  dimensions?: string | null
+  weight?: string | null
+  regionOrigin?: string | null
+  careInstructions?: string | null
+  specs?: Record<string, unknown> | null
   sku: string
   price: number
   mrp: number

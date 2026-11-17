@@ -47,11 +47,20 @@ Restart the Next.js dev server after changing env vars.
 
 The scripts are idempotent where possible (`IF NOT EXISTS`, `OR REPLACE`).
 
-## 4. Enable Auth providers
+## 4. Enable Auth providers + email delivery
 
 1. Open **Authentication → Providers**.
-2. Keep **Email** enabled for password sign-up (`/auth/sign-up`, `/auth/login`).
-3. (Optional) Add Google/GitHub OAuth and set the redirect URL to:
+2. Keep **Email** enabled for password sign-up (`/auth/sign-up`, `/auth/login`, `/artisan/join`).
+3. Open **Authentication → URL Configuration**:
+   - **Site URL:** your live domain (e.g. `https://crafthandmarket.com`) or Vercel preview URL
+   - **Redirect URLs:** include
+     - `https://YOUR_DOMAIN/auth/callback`
+     - `http://localhost:3000/auth/callback`
+4. **Confirmation emails not arriving?** Supabase’s built-in SMTP is heavily rate-limited.
+   - **Quick test:** Authentication → Providers → Email → turn **off** “Confirm email” so signup signs in immediately.
+   - **Production:** Authentication → Emails → set **custom SMTP** (Resend / SendGrid / SES) and keep confirmations on.
+5. Set `NEXT_PUBLIC_APP_URL` in Vercel / `.env.local` to the same public origin used above so signup emails redirect correctly.
+6. (Optional) Add Google/GitHub OAuth with redirect:
 
    `https://YOUR_DOMAIN/auth/callback`
 

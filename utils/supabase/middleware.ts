@@ -1,28 +1,30 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-import {
-  getSupabasePublishableKey,
-  getSupabaseUrl,
-} from "@/lib/supabase/config"
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 /**
- * Refresh the Supabase Auth session on every matched request and return
- * the updated response (with refreshed cookies) for the rest of middleware.
+ * Connect-style helper: build a Supabase server client bound to the request
+ * and return the response that carries refreshed auth cookies.
+ *
+ * Prefer `updateSession()` from the root middleware — it also calls
+ * `supabase.auth.getUser()` so sessions stay refreshed (required by @supabase/ssr).
  */
-export async function updateSession(request: NextRequest) {
+export function createClient(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
-    request,
+    request: {
+      headers: request.headers,
+    },
   })
 
-  const url = getSupabaseUrl()
-  const key = getSupabasePublishableKey()
-
-  // Allow local/dev builds without Supabase until keys are configured.
-  if (!url || !key) {
-    return { supabaseResponse, user: null, supabase: null }
+  if (!supabaseUrl || !supabaseKey) {
+    return { supabase: null, supabaseResponse }
   }
 
-  const supabase = createServerClient(url, key, {
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll()
@@ -40,6 +42,20 @@ export async function updateSession(request: NextRequest) {
       },
     },
   })
+
+  return { supabase, supabaseResponse }
+}
+
+/**
+ * Refresh the Supabase Auth session on every matched request and return
+ * the updated response (with refreshed cookies) for the rest of middleware.
+ */
+export async function updateSession(request: NextRequest) {
+  const { supabase, supabaseResponse } = createClient(request)
+
+  if (!supabase) {
+    return { supabaseResponse, user: null, supabase: null }
+  }
 
   // Important: avoid writing logic between createServerClient and getUser().
   const {

@@ -57,15 +57,30 @@ The script is idempotent where possible (`IF NOT EXISTS`, `OR REPLACE`).
 
 ## 5. What the app wires up
 
+These files match **Supabase Connect → Framework → Next.js → App Router**:
+
 | Path | Purpose |
 | --- | --- |
+| `.env.local` | `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
 | `utils/supabase/client.ts` | Browser client (`@supabase/ssr`) |
 | `utils/supabase/server.ts` | Server Components / Route Handlers |
-| `utils/supabase/middleware.ts` | Session refresh helper |
+| `utils/supabase/middleware.ts` | Session refresh helper (`createClient` + `updateSession`) |
 | `utils/supabase/admin.ts` | Service-role client (server only) |
 | `middleware.ts` | Refresh cookies + protect `/store`, `/artisan`, `/orders`, `/cart` when Supabase is configured; keeps existing `/admin` cookie RBAC |
 | `/auth/login`, `/auth/sign-up` | Email/password Auth UI |
 | `/auth/callback` | OAuth / email confirm exchange |
 
+The Connect sample `page.tsx` queries a demo `todos` table. This app uses the
+marketplace schema instead — start at `/auth/sign-up` or query `profiles` /
+`artisans` / `products` from a Server Component with `createClient()`.
+
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.
+
+## 6. Optional: Supabase agent skills
+
+```bash
+npx skills add supabase/agent-skills
+```
+
+Installed under `.agents/skills/` (`supabase`, `supabase-postgres-best-practices`).

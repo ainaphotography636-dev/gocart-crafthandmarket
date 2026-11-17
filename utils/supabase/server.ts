@@ -1,35 +1,38 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import {
-  getSupabasePublishableKey,
-  getSupabaseUrl,
-} from "@/lib/supabase/config"
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>
 
 /**
  * Server Supabase client for Server Components, Route Handlers, and Server Actions.
- * Refreshes the Auth session via cookies when needed.
+ * Matches Supabase Connect → Next.js App Router.
+ *
+ * Prefer `await createClient()` (reads cookies internally).
+ * `createClient(cookieStore)` is also supported for Connect-style call sites.
  */
-export async function createClient() {
-  const url = getSupabaseUrl()
-  const key = getSupabasePublishableKey()
-
-  if (!url || !key) {
+export async function createClient(cookieStore?: CookieStore) {
+  if (!supabaseUrl || !supabaseKey) {
     throw new Error(
       "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Add them to .env.local."
     )
   }
 
-  const cookieStore = await cookies()
+  const store = cookieStore ?? (await cookies())
 
-  return createServerClient(url, key, {
+  return createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
-        return cookieStore.getAll()
+        return store.getAll()
       },
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
+            store.set(name, value, options)
           })
         } catch {
           // Called from a Server Component — middleware will refresh the session.

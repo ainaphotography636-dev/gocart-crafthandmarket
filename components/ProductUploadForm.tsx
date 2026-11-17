@@ -10,6 +10,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
+import { createMarketplaceProduct } from "@/app/actions/marketplace-products"
 import { ARTISAN_CATEGORIES, addProduct } from "@/lib/productCatalog"
 import {
   compressAndUploadVideo,
@@ -400,30 +401,72 @@ export default function ProductUploadForm({
         throw new Error("Offer price cannot be higher than actual price.")
       }
 
+      const imageUrls = images.map((item) => item.url)
+      const videoUrl = video?.url || null
+
+      const persisted = await createMarketplaceProduct({
+        title: name,
+        description,
+        category,
+        priceUsd: price,
+        mrpUsd: mrp,
+        images: imageUrls,
+        videoProofUrl: videoUrl,
+        sku,
+        workshopName: store.name,
+        username: store.username,
+        artisanCode,
+        publish: true,
+      })
+
       const now = new Date().toISOString()
       const product = {
-        id: `prod_${Date.now()}`,
+        id: persisted.ok ? persisted.product.id : `prod_${Date.now()}`,
         storeId: store.id,
         storeUsername: store.username,
-        artisanCode,
-        sku,
+        artisanCode: persisted.ok ? persisted.product.artisanCode : artisanCode,
+        sku: persisted.ok ? persisted.product.sku : sku,
         skuSequence,
         name,
         description,
         mrp,
         price,
         category,
-        images: images.map((item) => item.url),
-        video: video?.url || null,
+        images: imageUrls,
+        video: videoUrl,
         mediaStorage: "r2" as const,
         inStock: true,
         rating: [],
         createdAt: now,
         updatedAt: now,
+        supabaseSynced: persisted.ok,
+        isPublished: persisted.ok ? persisted.product.isPublished : false,
       }
 
+      // Keep a local mirror for the legacy store dashboard until shop is fully hydrated.
       addProduct(product)
-      toast.success(`${formatProductTitle(product)} added — media on Cloudflare R2`)
+
+      if (persisted.ok === true) {
+        const publishedNote = persisted.product.isPublished
+          ? "published to the marketplace"
+          : "saved (pending workshop verification before public listing)"
+        toast.success(
+          `${formatProductTitle(product)} ${publishedNote} — media on Cloudflare R2`
+        )
+      } else if (persisted.code === "UNAUTHORIZED") {
+        toast.success(
+          `${formatProductTitle(product)} saved locally — sign in to sync to Supabase`
+        )
+      } else if (persisted.code === "SUPABASE_UNAVAILABLE") {
+        toast.success(
+          `${formatProductTitle(product)} saved locally — media on Cloudflare R2`
+        )
+      } else {
+        toast.error(persisted.error)
+        toast.success(
+          `${formatProductTitle(product)} kept in local workshop catalog as a backup`
+        )
+      }
 
       setProductInfo({
         name: "",
@@ -442,7 +485,11 @@ export default function ProductUploadForm({
       setError("")
       claimedRef.current = null
       if (!productIdProp) setProductId("")
-      if (!artisanIdProp) setArtisanId(store.artisanCode || artisanCode)
+      if (!artisanIdProp) {
+        setArtisanId(
+          persisted.ok ? persisted.product.artisanCode : store.artisanCode || artisanCode
+        )
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not add product")
     } finally {

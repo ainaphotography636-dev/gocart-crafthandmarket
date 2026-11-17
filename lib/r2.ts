@@ -43,6 +43,24 @@ export function isR2Configured() {
   return getR2Config().configured
 }
 
+/** Build a public object URL from an R2 key (or return absolute URLs unchanged). */
+export function resolvePublicMediaUrl(value?: string | null) {
+  const raw = String(value || "").trim()
+  if (!raw) return null
+  if (
+    raw.startsWith("http://") ||
+    raw.startsWith("https://") ||
+    raw.startsWith("data:") ||
+    raw.startsWith("blob:") ||
+    raw.startsWith("/")
+  ) {
+    return raw
+  }
+  const { publicBaseUrl, configured } = getR2Config()
+  if (!configured || !publicBaseUrl) return null
+  return `${publicBaseUrl}/${raw.replace(/^\//, "")}`
+}
+
 function createR2Client() {
   const config = getR2Config()
   if (!config.configured) {

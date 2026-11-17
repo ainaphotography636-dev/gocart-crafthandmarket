@@ -15,7 +15,9 @@ export default function LoginForm() {
   const [busy, setBusy] = useState(false)
 
   const configured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   )
 
   const onSubmit = async (event: FormEvent) => {
@@ -48,8 +50,9 @@ export default function LoginForm() {
       {!configured ? (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Add <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-          <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
-          <code className="font-mono">.env.local</code>, then restart the dev server.
+          <code className="font-mono">NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code>{" "}
+          to <code className="font-mono">.env.local</code>, then restart the
+          dev server.
         </div>
       ) : null}
 

@@ -1,12 +1,25 @@
 /**
  * Shared helpers for detecting whether Supabase Auth is configured.
+ *
+ * Supabase Connect (Next.js App Router) uses NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.
+ * NEXT_PUBLIC_SUPABASE_ANON_KEY remains supported as a legacy alias.
  */
 
-export function isSupabaseConfigured() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+export function getSupabaseUrl() {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || ""
+}
+
+/** Publishable (or legacy anon) public client key — safe for the browser. */
+export function getSupabasePublishableKey() {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    ""
   )
+}
+
+export function isSupabaseConfigured() {
+  return Boolean(getSupabaseUrl() && getSupabasePublishableKey())
 }
 
 export function isSupabaseServiceConfigured() {

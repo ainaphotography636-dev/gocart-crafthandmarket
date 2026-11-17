@@ -69,10 +69,10 @@ These files match **Supabase Connect → Framework → Next.js → App Router**:
 | `middleware.ts` | Refresh cookies + protect `/store`, `/artisan`, `/orders`, `/cart` when Supabase is configured; keeps existing `/admin` cookie RBAC |
 | `/auth/login`, `/auth/sign-up` | Email/password Auth UI |
 | `/auth/callback` | OAuth / email confirm exchange |
+| `app/actions/marketplace-products.ts` | Ensure `artisans` row + insert `products` after R2 upload |
 
-The Connect sample `page.tsx` queries a demo `todos` table. This app uses the
-marketplace schema instead — start at `/auth/sign-up` or query `profiles` /
-`artisans` / `products` from a Server Component with `createClient()`.
+Artisan product creates (`/artisan/products/new`) upload media to R2, then call
+`createMarketplaceProduct` to persist into Supabase (local catalog kept as a backup).
 
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.

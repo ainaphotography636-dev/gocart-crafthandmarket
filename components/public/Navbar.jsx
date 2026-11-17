@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSelector } from "react-redux";
-import toast from "react-hot-toast";
 import BrandLogo from "@/components/shared/BrandLogo";
 import CurrencySwitcher from "@/components/shared/CurrencySwitcher";
 
@@ -19,8 +18,7 @@ const navLinks = [
 /**
  * Crafthand Market public Navbar.
  * Preserves GoCart cart count via Redux (`state.cart.total`) and routes
- * cart interactions to `/cart` (storefront cart page — no separate drawer
- * provider exists in this codebase yet). Login remains an auth trigger hook.
+ * cart interactions to `/cart`. Login links to Supabase Auth (`/auth/login`).
  */
 const Navbar = () => {
     const router = useRouter()
@@ -33,11 +31,6 @@ const Navbar = () => {
         const q = search.trim()
         router.push(q ? `/shop?search=${encodeURIComponent(q)}` : '/shop')
         setMobileOpen(false)
-    }
-
-    const handleAuthTrigger = () => {
-        // Auth provider not wired yet — keep a visible trigger for Phase 1.
-        toast("Sign in will open here once authentication is connected.")
     }
 
     const handleCartOpen = () => {
@@ -93,13 +86,12 @@ const Navbar = () => {
                             </span>
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={handleAuthTrigger}
+                        <Link
+                            href="/auth/login"
                             className="px-8 py-2 bg-brand-emerald hover:bg-brand-amber transition text-white rounded-full"
                         >
                             Login
-                        </button>
+                        </Link>
                     </div>
 
                     {/* Mobile controls — cart + auth + menu */}
@@ -116,13 +108,13 @@ const Navbar = () => {
                                 {cartCount}
                             </span>
                         </button>
-                        <button
-                            type="button"
-                            onClick={handleAuthTrigger}
+                        <Link
+                            href="/auth/login"
                             className="px-4 py-1.5 bg-brand-emerald hover:bg-brand-amber text-sm transition text-white rounded-full"
+                            onClick={() => setMobileOpen(false)}
                         >
                             Login
-                        </button>
+                        </Link>
                         <button
                             type="button"
                             onClick={() => setMobileOpen((v) => !v)}

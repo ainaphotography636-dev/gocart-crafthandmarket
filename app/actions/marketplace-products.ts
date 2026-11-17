@@ -19,6 +19,7 @@ export type HandicraftSpecs = {
   regionOrigin?: string | null
   careInstructions?: string | null
   giTag?: string | null
+  stockQuantity?: number | null
   custom?: CustomSpec[]
 }
 
@@ -30,6 +31,8 @@ export type MarketplaceProductInput = {
   priceInr: number
   /** Actual / MRP price in INR */
   mrpInr?: number | null
+  /** Available inventory units */
+  stockQuantity?: number | null
   images: string[]
   videoProofUrl?: string | null
   sku?: string | null
@@ -114,6 +117,7 @@ type ParsedProductInput = {
   regionOrigin: string | null
   careInstructions: string | null
   giTag: string | null
+  stockQuantity: number | null
   customSpecs: CustomSpec[]
 }
 
@@ -165,6 +169,21 @@ function validateProductInput(
     return { ok: false, error: "Offer price cannot be higher than actual price." }
   }
 
+  const stockRaw =
+    input.stockQuantity !== undefined && input.stockQuantity !== null
+      ? input.stockQuantity
+      : specs.stockQuantity
+  const stockQuantity =
+    stockRaw === undefined || stockRaw === null ? null : Number(stockRaw)
+  if (
+    stockQuantity !== null &&
+    (!Number.isFinite(stockQuantity) ||
+      stockQuantity < 0 ||
+      !Number.isInteger(stockQuantity))
+  ) {
+    return { ok: false, error: "Enter a valid stock quantity." }
+  }
+
   return {
     ok: true,
     value: {
@@ -187,6 +206,7 @@ function validateProductInput(
       regionOrigin: String(specs.regionOrigin || "").trim() || null,
       careInstructions: String(specs.careInstructions || "").trim() || null,
       giTag: String(specs.giTag || "").trim() || null,
+      stockQuantity,
       customSpecs: normalizeCustomSpecs(specs.custom),
     },
   }
@@ -385,8 +405,12 @@ export async function createMarketplaceProduct(
     regionOrigin: parsed.regionOrigin,
     careInstructions: parsed.careInstructions,
     giTag: parsed.giTag,
+    stockQuantity: parsed.stockQuantity,
     custom: parsed.customSpecs,
   }
+
+  const inStock =
+    parsed.stockQuantity === null ? true : parsed.stockQuantity > 0
 
   const { data: product, error: insertError } = await supabase
     .from("products")
@@ -412,7 +436,7 @@ export async function createMarketplaceProduct(
       currency_default: "INR",
       images: parsed.images,
       video_proof_url: parsed.videoProofUrl,
-      in_stock: true,
+      in_stock: inStock,
       is_published: canPublish,
     })
     .select("id, sku, title, artisan_id, is_published")

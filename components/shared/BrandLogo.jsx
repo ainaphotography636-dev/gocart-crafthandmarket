@@ -7,6 +7,12 @@ const badgeStyles = {
   store: 'bg-brand-emerald text-white',
 }
 
+const badgeLabels = {
+  plus: 'Plus',
+  admin: 'Admin',
+  store: 'Artisan Portal',
+}
+
 /**
  * Crafthand Market brand mark — shared across public, store, and admin shells.
  */
@@ -27,7 +33,7 @@ export default function BrandLogo({ href = '/', badge, className = '' }) {
         <span
           className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${badgeStyles[badge] || badgeStyles.plus}`}
         >
-          {badge}
+          {badgeLabels[badge] || badge}
         </span>
       ) : null}
     </Link>

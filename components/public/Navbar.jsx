@@ -11,7 +11,7 @@ const navLinks = [
     { href: "/", label: "Home" },
     { href: "/shop", label: "Shop" },
     { href: "/artisans", label: "Artisans" },
-    { href: "/create-store", label: "Sell" },
+    { href: "/artisan/join", label: "Become an Artisan" },
     { href: "/pricing", label: "Pricing" },
 ]
 

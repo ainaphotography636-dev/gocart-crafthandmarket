@@ -1,10 +1,9 @@
-import StoreLayout from "@/components/store/StoreLayout"
-
 export const metadata = {
-  title: "Crafthand Market — Artisan workshop",
-  description: "Create and manage artisan products on Crafthand Market.",
+  title: "Crafthand Market — Artisan",
+  description: "Artisan onboarding and workshop tools on Crafthand Market.",
 }
 
-export default function ArtisanLayout({ children }) {
-  return <StoreLayout>{children}</StoreLayout>
+/** Shared artisan segment — onboarding stays chrome-free; workshop adds StoreLayout. */
+export default function ArtisanSegmentLayout({ children }) {
+  return children
 }

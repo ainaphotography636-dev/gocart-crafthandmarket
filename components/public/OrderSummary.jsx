@@ -5,12 +5,14 @@ import AddressModal from './AddressModal'
 import { useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/components/auth/AuthProvider'
 import { useCurrency } from '@/components/shared/CurrencyProvider'
 
 const OrderSummary = ({ totalPrice, items }) => {
 
     const { currency: currencyInfo } = useCurrency()
     const currency = currencyInfo.symbol
+    const { requireClientAuth } = useAuth()
 
     const router = useRouter();
 
@@ -29,6 +31,10 @@ const OrderSummary = ({ totalPrice, items }) => {
 
     const handlePlaceOrder = async (e) => {
         e.preventDefault();
+
+        if (!requireClientAuth({ nextPath: '/orders' })) {
+            throw new Error('Log in or sign up to save your cart and complete your order.')
+        }
 
         router.push('/orders')
     }

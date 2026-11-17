@@ -1,6 +1,7 @@
 import localFont from "next/font/local";
 import { Toaster } from "react-hot-toast";
 import StoreProvider from "@/app/StoreProvider";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import { CurrencyProvider } from "@/components/shared/CurrencyProvider";
 import "./globals.css";
 
@@ -22,8 +23,10 @@ export default function RootLayout({ children }) {
       <body className={`${outfit.className} antialiased`}>
         <StoreProvider>
           <CurrencyProvider>
-            <Toaster />
-            {children}
+            <AuthProvider>
+              <Toaster />
+              {children}
+            </AuthProvider>
           </CurrencyProvider>
         </StoreProvider>
       </body>

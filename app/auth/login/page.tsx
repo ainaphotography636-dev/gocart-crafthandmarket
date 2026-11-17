@@ -10,7 +10,12 @@ export default function AuthLoginPage() {
           Sign in to <span className="text-brand-emerald">Crafthand Market</span>
         </h1>
         <p className="mt-3 text-sm text-slate-500">
-          Artisan dashboards, checkout, and orders require a Supabase Auth session.
+          Clients use this flow to save a cart and checkout. Artisans should enter
+          through{" "}
+          <a href="/artisan/join" className="text-brand-emerald hover:underline">
+            Become an Artisan
+          </a>
+          .
         </p>
         <Suspense fallback={<p className="mt-8 text-sm text-slate-400">Loading sign-in…</p>}>
           <LoginForm />

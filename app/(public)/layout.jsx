@@ -7,7 +7,7 @@ import Footer from "@/components/public/Footer";
  * Public storefront shell — Phase 1 Crafthand Market chrome.
  * Keeps GoCart multi-vendor public routes intact while mounting
  * Crafthand Navbar/Footer. Cart state stays on root StoreProvider (Redux);
- * auth remains trigger-only via Navbar Login until a provider is added.
+ * client auth is modal-driven from Add to Cart / checkout via AuthProvider.
  */
 export default function PublicLayout({ children }) {
     return (

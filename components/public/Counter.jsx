@@ -1,14 +1,17 @@
 'use client'
 import { addToCart, removeFromCart } from "@/lib/features/cart/cartSlice";
 import { useDispatch, useSelector } from "react-redux";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const Counter = ({ productId }) => {
 
     const { cartItems } = useSelector(state => state.cart);
+    const { requireClientAuth } = useAuth();
 
     const dispatch = useDispatch();
 
     const addToCartHandler = () => {
+        if (!requireClientAuth({ productId, nextPath: "/cart" })) return
         dispatch(addToCart({ productId }))
     }
 

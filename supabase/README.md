@@ -30,22 +30,22 @@ share one database.
 
 Restart the Next.js dev server after changing env vars.
 
-## 3. Run the marketplace SQL migration
+## 3. Run the marketplace SQL migrations
 
 1. In the Supabase dashboard open **SQL → New query**.
-2. Paste the full contents of:
+2. Run these files in order:
 
-   `supabase/migrations/20261117_marketplace_schema.sql`
+   - `supabase/migrations/20261117_marketplace_schema.sql`
+   - `supabase/migrations/20261117_client_role.sql` (adds `client` role; keeps legacy `buyer`)
 
-3. Click **Run**.
-4. Confirm tables exist under **Table Editor**:
+3. Confirm tables exist under **Table Editor**:
    - `profiles`
    - `artisans`
    - `products`
    - `orders`
    - `order_items`
 
-The script is idempotent where possible (`IF NOT EXISTS`, `OR REPLACE`).
+The scripts are idempotent where possible (`IF NOT EXISTS`, `OR REPLACE`).
 
 ## 4. Enable Auth providers
 
@@ -66,13 +66,17 @@ These files match **Supabase Connect → Framework → Next.js → App Router**:
 | `utils/supabase/server.ts` | Server Components / Route Handlers |
 | `utils/supabase/middleware.ts` | Session refresh helper (`createClient` + `updateSession`) |
 | `utils/supabase/admin.ts` | Service-role client (server only) |
-| `middleware.ts` | Refresh cookies + protect `/store`, `/artisan`, `/orders`, `/cart` when Supabase is configured; keeps existing `/admin` cookie RBAC |
-| `/auth/login`, `/auth/sign-up` | Email/password Auth UI |
+| `middleware.ts` | Refresh cookies; role-gate `/store` + `/artisan/*` (artisan); protect `/orders` (signed-in); keep `/cart` public |
+| `/auth/login`, `/auth/sign-up` | Client (default) or artisan (`?intent=artisan`) auth |
+| `/artisan/join`, `/artisan/login` | Partner / campaign artisan onboarding |
+| `components/auth/*` | `AuthProvider`, cart-triggered `ClientAuthModal`, shared `RoleAuthForm` |
 | `/auth/callback` | OAuth / email confirm exchange |
 | `app/actions/marketplace-products.ts` | Ensure `artisans` row + insert `products` after R2 upload |
+| `app/actions/auth-profile.ts` | Ensure `profiles.role` matches entry-point intent |
 
-Artisan product creates (`/artisan/products/new`) upload media to R2, then call
-`createMarketplaceProduct` to persist into Supabase (local catalog kept as a backup).
+**Client flow:** browse freely → Add to Cart / Place Order opens client auth modal → role `client` → cart restored → continue to `/cart` or `/orders`.
+
+**Artisan flow:** `/artisan/join` (or Navbar “Become an Artisan”) → role `artisan` → `/store` dashboard.
 
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.

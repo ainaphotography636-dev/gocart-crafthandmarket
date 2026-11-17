@@ -7,6 +7,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Counter from "./Counter";
 import { useDispatch, useSelector } from "react-redux";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useCurrency } from "@/components/shared/CurrencyProvider";
 import { formatProductTitle } from "@/lib/productCodes";
 
@@ -15,6 +16,7 @@ const ProductDetails = ({ product }) => {
     const productId = product.id;
     const { currency: currencyInfo } = useCurrency();
     const currency = currencyInfo.symbol;
+    const { requireClientAuth } = useAuth();
 
     const cart = useSelector(state => state.cart.cartItems);
     const dispatch = useDispatch();
@@ -24,6 +26,7 @@ const ProductDetails = ({ product }) => {
     const [mainImage, setMainImage] = useState(product.images[0]);
 
     const addToCartHandler = () => {
+        if (!requireClientAuth({ productId, nextPath: "/cart" })) return
         dispatch(addToCart({ productId }))
     }
 

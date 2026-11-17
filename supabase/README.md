@@ -11,11 +11,14 @@ From **Project Settings → API**:
 
 | Env var | Where to find it |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (`sb_publishable_…`) from Connect / API Keys |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret / `service_role` key (keep secret) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL (browser / `@supabase/ssr`) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (`sb_publishable_…`) |
+| `SUPABASE_URL` | Same project URL for `@supabase/server` |
+| `SUPABASE_PUBLISHABLE_KEY` | Same publishable key for backend handlers |
+| `SUPABASE_SECRET_KEY` | Secret key (`sb_secret_…`) — keep private |
+| `SUPABASE_JWKS_URL` | `{project}/auth/v1/.well-known/jwks.json` |
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy alias for the publishable key.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` remain accepted as legacy aliases.
 
 Copy `.env.example` values into `.env.local` and replace the placeholders:
 
@@ -61,18 +64,20 @@ These files match **Supabase Connect → Framework → Next.js → App Router**:
 
 | Path | Purpose |
 | --- | --- |
-| `.env.local` | `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| `.env.local` | App Router + `@supabase/server` Connect env vars |
 | `utils/supabase/client.ts` | Browser client (`@supabase/ssr`) |
-| `utils/supabase/server.ts` | Server Components / Route Handlers |
+| `utils/supabase/server.ts` | Server Components / Route Handlers (`@supabase/ssr`) |
 | `utils/supabase/middleware.ts` | Session refresh helper (`createClient` + `updateSession`) |
-| `utils/supabase/admin.ts` | Service-role client (server only) |
+| `utils/supabase/admin.ts` | Secret-key client (server only) |
+| `lib/supabase/context.ts` | Next.js adapter: `@supabase/ssr` cookies + `@supabase/server/core` |
+| `app/api/me/route.ts` | Example authenticated API using `createSupabaseContext()` |
 | `middleware.ts` | Refresh cookies + protect `/store`, `/artisan`, `/orders`, `/cart` when Supabase is configured; keeps existing `/admin` cookie RBAC |
 | `/auth/login`, `/auth/sign-up` | Email/password Auth UI |
 | `/auth/callback` | OAuth / email confirm exchange |
 
 The Connect sample `page.tsx` queries a demo `todos` table. This app uses the
-marketplace schema instead — start at `/auth/sign-up` or query `profiles` /
-`artisans` / `products` from a Server Component with `createClient()`.
+marketplace schema instead — start at `/auth/sign-up` or call `/api/me`
+when signed in.
 
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.
@@ -81,6 +86,8 @@ workshop flows (localStorage) keep working.
 
 ```bash
 npx skills add supabase/agent-skills
+npx skills add supabase/server
 ```
 
-Installed under `.agents/skills/` (`supabase`, `supabase-postgres-best-practices`).
+Installed under `.agents/skills/` (`supabase`, `supabase-postgres-best-practices`,
+`supabase-server`).

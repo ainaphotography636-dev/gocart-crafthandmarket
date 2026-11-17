@@ -20,6 +20,7 @@
     "@ffmpeg/util": "^0.12.2",
     "@prisma/client": "^6.19.0",
     "@reduxjs/toolkit": "^2.8.2",
+    "@supabase/server": "^1.9.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
     "@tailwindcss/postcss": "^4",

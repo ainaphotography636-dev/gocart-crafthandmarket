@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
-function requiredEnv(...names) {
+function requiredEnv(...names: string[]) {
   for (const name of names) {
     const value = process.env[name]
     if (value && String(value).trim()) return String(value).trim()
@@ -64,7 +64,7 @@ function createR2Client() {
   }
 }
 
-function sanitizeFilename(name) {
+function sanitizeFilename(name: string) {
   return String(name || "image")
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, "-")
@@ -72,21 +72,71 @@ function sanitizeFilename(name) {
     .slice(0, 80)
 }
 
-function buildObjectKey({ filename, storeId = "store", kind = "image" }) {
+function sanitizePathSegment(value: string | undefined | null, fallback: string) {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+  return cleaned || fallback
+}
+
+type ProductObjectKeyInput = {
+  filename: string
+  artisanId?: string | null
+  productId?: string | null
+  storeId?: string | null
+  kind?: string
+}
+
+/**
+ * Product media path:
+ * artisans/{artisanId}/products/{productId}/{timestamp}-{fileName}
+ */
+export function buildProductObjectKey({
+  filename,
+  artisanId,
+  productId,
+  storeId,
+  kind = "image",
+}: ProductObjectKeyInput) {
   const safeName = sanitizeFilename(filename)
-  const folder = kind === "video" ? "videos" : "images"
-  return `products/${storeId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+  const artisanSegment = sanitizePathSegment(
+    artisanId || storeId,
+    "artisan-unknown"
+  )
+  const productSegment = sanitizePathSegment(productId, `draft-${kind}`)
+  const timestamp = Date.now()
+  return `artisans/${artisanSegment}/products/${productSegment}/${timestamp}-${safeName}`
+}
+
+type UploadProductMediaInput = {
+  fileBuffer: Buffer
+  contentType?: string
+  filename: string
+  artisanId?: string | null
+  productId?: string | null
+  storeId?: string
+  kind?: string
 }
 
 export async function uploadProductMediaToR2({
   fileBuffer,
   contentType,
   filename,
+  artisanId,
+  productId,
   storeId = "store",
   kind = "image",
-}) {
+}: UploadProductMediaInput) {
   const { client, config } = createR2Client()
-  const key = buildObjectKey({ filename, storeId, kind })
+  const key = buildProductObjectKey({
+    filename,
+    artisanId,
+    productId,
+    storeId,
+    kind,
+  })
 
   await client.send(
     new PutObjectCommand({
@@ -104,15 +154,33 @@ export async function uploadProductMediaToR2({
   }
 }
 
+type PresignProductUploadInput = {
+  filename: string
+  contentType?: string
+  artisanId?: string | null
+  productId?: string | null
+  storeId?: string
+  kind?: string
+  expiresIn?: number
+}
+
 export async function createPresignedProductUpload({
   filename,
   contentType,
+  artisanId,
+  productId,
   storeId = "store",
   kind = "image",
   expiresIn = 600,
-}) {
+}: PresignProductUploadInput) {
   const { client, config } = createR2Client()
-  const key = buildObjectKey({ filename, storeId, kind })
+  const key = buildProductObjectKey({
+    filename,
+    artisanId,
+    productId,
+    storeId,
+    kind,
+  })
 
   const command = new PutObjectCommand({
     Bucket: config.bucket,
@@ -130,27 +198,35 @@ export async function createPresignedProductUpload({
   }
 }
 
-async function streamToString(body) {
+async function streamToString(body: any) {
   if (!body) return ""
   if (typeof body.transformToString === "function") {
     return body.transformToString()
   }
-  const chunks = []
+  const chunks: Buffer[] = []
   for await (const chunk of body) {
     chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk)
   }
   return Buffer.concat(chunks).toString("utf8")
 }
 
-export function artisanProfileKey(artisanCode) {
+export function artisanProfileKey(artisanCode: string) {
   return `artisans/${String(artisanCode || "ART000").toUpperCase()}/profile.json`
 }
 
-export function artisanLogoKey(artisanCode, ext = "jpg") {
+export function artisanLogoKey(artisanCode: string, ext = "jpg") {
   return `artisans/${String(artisanCode || "ART000").toUpperCase()}/logo.${ext}`
 }
 
-export async function putJsonToR2({ key, data, contentType = "application/json" }) {
+export async function putJsonToR2({
+  key,
+  data,
+  contentType = "application/json",
+}: {
+  key: string
+  data: unknown
+  contentType?: string
+}) {
   const { client, config } = createR2Client()
   await client.send(
     new PutObjectCommand({
@@ -164,7 +240,15 @@ export async function putJsonToR2({ key, data, contentType = "application/json" 
   return { key, url: `${config.publicBaseUrl}/${key}` }
 }
 
-export async function putBinaryToR2({ key, fileBuffer, contentType }) {
+export async function putBinaryToR2({
+  key,
+  fileBuffer,
+  contentType,
+}: {
+  key: string
+  fileBuffer: Buffer
+  contentType?: string
+}) {
   const { client, config } = createR2Client()
   await client.send(
     new PutObjectCommand({
@@ -178,7 +262,7 @@ export async function putBinaryToR2({ key, fileBuffer, contentType }) {
   return { key, url: `${config.publicBaseUrl}/${key}` }
 }
 
-export async function getJsonFromR2(key) {
+export async function getJsonFromR2(key: string) {
   const { client, config } = createR2Client()
   const response = await client.send(
     new GetObjectCommand({
@@ -195,8 +279,8 @@ export async function getJsonFromR2(key) {
  */
 export async function listArtisanProfilesFromR2() {
   const { client, config } = createR2Client()
-  const profiles = []
-  let continuationToken
+  const profiles: any[] = []
+  let continuationToken: string | undefined
 
   do {
     const listed = await client.send(
@@ -209,7 +293,7 @@ export async function listArtisanProfilesFromR2() {
 
     const keys = (listed.Contents || [])
       .map((item) => item.Key)
-      .filter((key) => key && key.endsWith("/profile.json"))
+      .filter((key): key is string => Boolean(key) && key.endsWith("/profile.json"))
 
     for (const key of keys) {
       try {
@@ -235,7 +319,7 @@ export async function listArtisanProfilesFromR2() {
  * Persist a workshop/artisan profile into the Cloudflare R2 bucket.
  * Uploads logo bytes when a data URL is provided.
  */
-export async function syncArtisanProfileToR2(store) {
+export async function syncArtisanProfileToR2(store: any) {
   if (!store?.artisanCode && !store?.username) {
     throw new Error("Artisan code or username is required to sync a profile.")
   }

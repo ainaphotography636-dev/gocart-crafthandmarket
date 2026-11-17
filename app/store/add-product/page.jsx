@@ -9,6 +9,7 @@ import {
   createStoreProduct,
   listStoreProducts,
 } from "@/lib/productCatalog"
+import { getActiveStore } from "@/lib/storeRegistry"
 import { setProduct } from "@/lib/features/product/productSlice"
 import { ClapperboardIcon } from "lucide-react"
 import { formatProductTitle } from "@/lib/productCodes"
@@ -18,6 +19,7 @@ export default function StoreAddProduct() {
   const [images, setImages] = useState({ 1: null, 2: null, 3: null, 4: null })
   const [video, setVideo] = useState(null)
   const [videoPreview, setVideoPreview] = useState("")
+  const [artisanCode, setArtisanCode] = useState("")
   const [productInfo, setProductInfo] = useState({
     name: "",
     description: "",
@@ -26,6 +28,11 @@ export default function StoreAddProduct() {
     category: "",
   })
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const store = getActiveStore()
+    setArtisanCode(store?.artisanCode || "")
+  }, [])
 
   const onChangeHandler = (e) => {
     setProductInfo({ ...productInfo, [e.target.name]: e.target.value })
@@ -95,8 +102,18 @@ export default function StoreAddProduct() {
         Add New <span className="text-slate-800 font-medium">Workshop Piece</span>
       </h1>
       <p className="text-sm mt-2 max-w-xl">
-        Upload product photos and an optional making-of video. Files go to your Cloudflare R2
-        bucket (`crafthandmarket`).
+        Upload product photos and an optional making-of video. Files go to Cloudflare R2 under
+        {artisanCode ? (
+          <>
+            {" "}
+            <span className="font-mono text-brand-emerald">
+              artisans/{artisanCode}/products/&lt;SKU&gt;/
+            </span>
+          </>
+        ) : (
+          " artisans/{artisanId}/products/{productId}/"
+        )}
+        .
       </p>
 
       <p className="mt-8 text-slate-700 font-medium">Product images</p>

@@ -73,10 +73,14 @@ These files match **Supabase Connect → Framework → Next.js → App Router**:
 | `/auth/callback` | OAuth / email confirm exchange |
 | `app/actions/marketplace-products.ts` | Ensure `artisans` row + insert `products` after R2 upload |
 | `app/actions/auth-profile.ts` | Ensure `profiles.role` matches entry-point intent |
+| `lib/marketplace/catalog.ts` | Server catalog reads (published products + verified artisans) |
+| `/shop`, `/artisans`, `/shop/[username]`, `/product/[id]` | Public storefront powered by Supabase + R2 media URLs |
 
 **Client flow:** browse freely → Add to Cart / Place Order opens client auth modal → role `client` → cart restored → continue to `/cart` or `/orders`.
 
 **Artisan flow:** `/artisan/join` (or Navbar “Become an Artisan”) → role `artisan` → `/store` dashboard.
+
+**Storefront visibility:** artisans need `verification_status = verified` and `is_active = true`; products need `is_published = true` and `in_stock = true`.
 
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.

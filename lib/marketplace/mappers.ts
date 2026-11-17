@@ -23,7 +23,15 @@ type ProductRow = {
   category: string | null
   material: string | null
   gi_tag: string | null
+  craft_technique?: string | null
+  dimensions?: string | null
+  weight?: string | null
+  region_origin?: string | null
+  care_instructions?: string | null
+  specs?: Record<string, unknown> | null
   sku: string
+  price_inr?: number | string | null
+  mrp_inr?: number | string | null
   price_usd: number | string
   mrp_usd: number | string | null
   currency_default: string | null
@@ -33,6 +41,14 @@ type ProductRow = {
   is_published: boolean
   created_at: string | null
   artisans?: ArtisanRow | ArtisanRow[] | null
+}
+
+function firstPositiveNumber(...values: Array<number | string | null | undefined>) {
+  for (const value of values) {
+    const n = Number(value)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return 0
 }
 
 function asSingleArtisan(value: ProductRow["artisans"]): ArtisanRow | null {
@@ -61,10 +77,14 @@ export function mapArtisanRow(row: ArtisanRow): StorefrontArtisan {
 
 export function mapProductRow(row: ProductRow): StorefrontProduct {
   const artisan = asSingleArtisan(row.artisans)
-  const price = Number(row.price_usd) || 0
-  const mrp = Number(row.mrp_usd)
+  const price = firstPositiveNumber(row.price_inr, row.price_usd)
+  const mrp = firstPositiveNumber(row.mrp_inr, row.mrp_usd, price)
   const images = resolveMediaUrls(row.images)
   const video = resolveMediaUrl(row.video_proof_url)
+  const specs =
+    row.specs && typeof row.specs === "object" && !Array.isArray(row.specs)
+      ? row.specs
+      : null
 
   return {
     id: row.id,
@@ -74,10 +94,16 @@ export function mapProductRow(row: ProductRow): StorefrontProduct {
     category: row.category || "Handicraft",
     material: row.material,
     giTag: row.gi_tag,
+    craftTechnique: row.craft_technique || null,
+    dimensions: row.dimensions || null,
+    weight: row.weight || null,
+    regionOrigin: row.region_origin || null,
+    careInstructions: row.care_instructions || null,
+    specs,
     sku: row.sku,
     price,
-    mrp: Number.isFinite(mrp) && mrp > 0 ? mrp : price,
-    currencyDefault: row.currency_default || "USD",
+    mrp,
+    currencyDefault: row.currency_default || "INR",
     images,
     video,
     inStock: Boolean(row.in_stock),

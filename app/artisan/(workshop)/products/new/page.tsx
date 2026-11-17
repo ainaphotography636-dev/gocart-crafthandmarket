@@ -3,13 +3,10 @@
 import ProductUploadForm from "@/components/ProductUploadForm"
 
 /**
- * Artisan product creation — media dropzone with client-side video compression
- * and R2 paths under artisans/{artisanId}/products/{productId}/.
+ * Artisan product creation — 4–6 R2 photos, optional product video,
+ * INR pricing, handicraft specs, draft / publish.
+ * Media paths: artisans/{artisanId}/products/{sku}/
  */
 export default function ArtisanNewProductPage() {
-  return (
-    <div className="pb-16">
-      <ProductUploadForm />
-    </div>
-  )
+  return <ProductUploadForm />
 }

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react"
 import Link from "next/link"
 import toast from "react-hot-toast"
 import { ensureProfileRole } from "@/app/actions/auth-profile"
+import { buildAuthEmailRedirect } from "@/lib/auth/siteUrl"
 import {
   defaultPathForRole,
   signupRoleForIntent,
@@ -35,6 +36,8 @@ export default function RoleAuthForm({
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
+  const [awaitingEmail, setAwaitingEmail] = useState(false)
+  const [resendBusy, setResendBusy] = useState(false)
 
   const configured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -66,12 +69,19 @@ export default function RoleAuthForm({
     setBusy(true)
     try {
       const supabase = createClient()
+      const trimmedEmail = email.trim().toLowerCase()
 
       if (mode === "signup") {
+        const emailRedirectTo = buildAuthEmailRedirect({
+          nextPath: fallbackNext,
+          intent,
+        })
+
         const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: trimmedEmail,
           password,
           options: {
+            emailRedirectTo,
             data: {
               full_name: fullName.trim(),
               role: signupRoleForIntent(intent),
@@ -80,8 +90,23 @@ export default function RoleAuthForm({
         })
         if (error) throw error
 
+        // Supabase returns a user with empty identities when the email is
+        // already registered — no confirmation email is sent again.
+        const identities = data.user?.identities || []
+        if (data.user && identities.length === 0) {
+          toast.error(
+            "This email is already registered. Log in instead, or use Resend confirmation below."
+          )
+          setMode("login")
+          setAwaitingEmail(true)
+          return
+        }
+
         if (!data.session) {
-          toast.success("Check your email to confirm your account")
+          setAwaitingEmail(true)
+          toast.success(
+            "Account created. Check your inbox (and spam) for the confirmation link."
+          )
           setMode("login")
           return
         }
@@ -91,21 +116,69 @@ export default function RoleAuthForm({
             ? "Welcome — your artisan account is ready"
             : "Welcome — your client account is ready"
         )
+        setAwaitingEmail(false)
         await finish("signup")
         return
       }
 
       const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
       })
-      if (error) throw error
+      if (error) {
+        if (/email not confirmed/i.test(error.message)) {
+          setAwaitingEmail(true)
+          toast.error(
+            "Email not confirmed yet. Use Resend confirmation below, or confirm from your inbox."
+          )
+          return
+        }
+        throw error
+      }
       toast.success("Signed in")
+      setAwaitingEmail(false)
       await finish("login")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Authentication failed")
     } finally {
       setBusy(false)
+    }
+  }
+
+  const resendConfirmation = async () => {
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail) {
+      toast.error("Enter your email first.")
+      return
+    }
+    if (!configured) {
+      toast.error("Supabase is not configured yet.")
+      return
+    }
+
+    setResendBusy(true)
+    try {
+      const supabase = createClient()
+      const emailRedirectTo = buildAuthEmailRedirect({
+        nextPath: fallbackNext,
+        intent,
+      })
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: trimmedEmail,
+        options: { emailRedirectTo },
+      })
+      if (error) throw error
+      toast.success("Confirmation email resent — check inbox and spam.")
+      setAwaitingEmail(true)
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not resend confirmation email"
+      )
+    } finally {
+      setResendBusy(false)
     }
   }
 
@@ -199,6 +272,34 @@ export default function RoleAuthForm({
               : `Log in as ${roleLabel}`}
         </button>
       </form>
+
+      {awaitingEmail ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p>
+            Waiting on the confirmation email. Check spam/junk. Supabase&apos;s
+            built-in mailer is rate-limited — for production, add custom SMTP
+            under <strong>Authentication → Emails</strong>, or temporarily
+            disable <strong>Confirm email</strong> while testing.
+          </p>
+          <button
+            type="button"
+            onClick={() => void resendConfirmation()}
+            disabled={resendBusy || !configured}
+            className="mt-3 text-sm font-medium text-brand-emerald hover:underline disabled:opacity-60"
+          >
+            {resendBusy ? "Resending…" : "Resend confirmation email"}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void resendConfirmation()}
+          disabled={resendBusy || !configured || !email.trim()}
+          className="mt-3 w-full text-center text-xs text-slate-500 hover:text-brand-emerald disabled:opacity-40"
+        >
+          {resendBusy ? "Resending…" : "Resend confirmation email"}
+        </button>
+      )}
 
       {intent === "client" ? (
         <p className="mt-4 text-center text-xs text-slate-500">

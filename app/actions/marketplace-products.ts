@@ -477,7 +477,9 @@ export async function createMarketplaceProduct(
     mrp_inr: parsed.mrpInr,
     price_usd: parsed.priceInr,
     mrp_usd: parsed.mrpInr,
-    currency_default: "INR",
+    // Prefer INR once the enum migration is committed; USD keeps inserts
+    // working when Step 1 (ADD VALUE 'INR') has not been run yet.
+    currency_default: "USD",
     images: parsed.images,
     video_proof_url: parsed.videoProofUrl,
     in_stock: inStock,

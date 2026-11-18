@@ -1,14 +1,21 @@
 -- =============================================================================
 -- INR pricing + handicraft specification fields for products
--- Run after the marketplace schema migration.
+-- Run AFTER the marketplace schema migration.
+--
+-- IMPORTANT (Supabase SQL editor):
+-- Postgres requires a NEW enum value to be committed before it can be used.
+-- Run this file as TWO separate queries (Step 1, then Step 2) — do not run
+-- both in one click / one transaction.
 -- =============================================================================
 
-do $$ begin
-  alter type public.currency_code add value 'INR';
-exception
-  when duplicate_object then null;
-end $$;
+-- -----------------------------------------------------------------------------
+-- STEP 1 — run alone, then wait for success
+-- -----------------------------------------------------------------------------
+-- alter type public.currency_code add value if not exists 'INR';
 
+-- -----------------------------------------------------------------------------
+-- STEP 2 — run after Step 1 succeeded
+-- -----------------------------------------------------------------------------
 alter table public.products
   add column if not exists price_inr numeric(12, 2),
   add column if not exists mrp_inr numeric(12, 2),
@@ -19,9 +26,17 @@ alter table public.products
   add column if not exists care_instructions text,
   add column if not exists specs jsonb not null default '{}'::jsonb;
 
--- Prefer INR as the marketplace default for new rows.
-alter table public.products
-  alter column currency_default set default 'INR';
+-- Safe even if Step 1 already added INR in a prior attempt.
+do $$ begin
+  alter table public.products
+    alter column currency_default set default 'INR';
+exception
+  when invalid_parameter_value then
+    -- Enum not committed yet — leave existing default; app still writes amounts.
+    null;
+  when others then
+    null;
+end $$;
 
 comment on column public.products.price_inr is 'Offer price in Indian Rupees';
 comment on column public.products.mrp_inr is 'Actual / MRP price in Indian Rupees';

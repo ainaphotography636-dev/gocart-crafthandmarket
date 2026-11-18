@@ -122,7 +122,14 @@ These files match **Supabase Connect → Framework → Next.js → App Router**:
 
 **Storefront visibility:** artisans need `verification_status = verified` and `is_active = true`; products need `is_published = true` and `in_stock = true`.
 
-**Required follow-up migration:** run `20261117_product_inr_specs.sql` in the Supabase SQL editor if the shop shows `column products.weight does not exist` (or missing `price_inr` / `specs`). The app falls back to a compatible select/insert without those columns, but INR-specific fields will only persist after the migration.
+**Required follow-up migration (two separate SQL editor runs):**
+
+Postgres will error with `unsafe use of new value "INR"` if you add the enum and set it as a default in one transaction.
+
+1. Run `20261118_product_inr_enum.sql` alone → Success  
+2. Then run `20261118_product_inr_columns.sql` alone → Success  
+
+The app falls back when those columns are missing, but INR columns only persist after both steps.
 
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.

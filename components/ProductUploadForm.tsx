@@ -463,7 +463,12 @@ export default function ProductUploadForm({
     setSaving(publish ? "publish" : "draft")
     try {
       const store = getActiveStore()
-      if (!store || store.status !== "approved") {
+      if (!store) {
+        throw new Error(
+          "Connect an active workshop before saving products."
+        )
+      }
+      if (store.status !== "approved" || !store.isActive) {
         throw new Error(
           "Approve and activate your workshop before adding products."
         )
@@ -499,7 +504,7 @@ export default function ProductUploadForm({
       const category = String(productInfo.category || "").trim()
       const mrp = Number(productInfo.mrp)
       const price = Number(productInfo.price)
-      const stock = Number(productInfo.stock)
+      const stockQty = Number.parseInt(String(productInfo.stock), 10)
 
       if (!name) throw new Error("Product title is required.")
       if (!description) throw new Error("Story & description is required.")
@@ -513,7 +518,7 @@ export default function ProductUploadForm({
       if (price > mrp) {
         throw new Error("Offer price cannot be higher than actual price.")
       }
-      if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
+      if (!Number.isFinite(stockQty) || stockQty < 0) {
         throw new Error("Enter a valid stock quantity.")
       }
 
@@ -526,7 +531,7 @@ export default function ProductUploadForm({
         category,
         priceInr: price,
         mrpInr: mrp,
-        stockQuantity: stock,
+        stockQuantity: stockQty,
         images: imageUrls,
         videoProofUrl: videoUrl,
         sku,
@@ -555,12 +560,12 @@ export default function ProductUploadForm({
         description,
         mrp,
         price,
-        stock,
+        stock: stockQty,
         category,
         images: imageUrls,
         video: videoUrl,
         mediaStorage: "r2" as const,
-        inStock: stock > 0,
+        inStock: stockQty > 0,
         rating: [],
         createdAt: now,
         updatedAt: now,
@@ -574,14 +579,19 @@ export default function ProductUploadForm({
       if (persisted.ok === false) {
         if (persisted.code === "UNAUTHORIZED") {
           toast.success(
-            `${formatProductTitle(product)} saved locally — sign in to sync to Supabase`
+            `${formatProductTitle(product)} saved to workshop catalog — sign in to sync to Supabase`
           )
         } else if (persisted.code === "SUPABASE_UNAVAILABLE") {
-          toast.success(`${formatProductTitle(product)} saved locally`)
-        } else {
-          toast.error(persisted.error)
           toast.success(
-            `${formatProductTitle(product)} kept in local workshop catalog as a backup`
+            `${formatProductTitle(product)} saved to workshop catalog`
+          )
+        } else if (persisted.code === "VALIDATION") {
+          toast.error(persisted.error)
+          return
+        } else {
+          // Keep a local copy even when cloud insert fails (e.g. missing migration).
+          toast.success(
+            `${formatProductTitle(product)} saved to workshop catalog (cloud sync pending)`
           )
         }
         resetForm(store.artisanCode || artisanCode)
@@ -608,6 +618,25 @@ export default function ProductUploadForm({
 
   const pathPreview = `artisans/${artisanId || "ART001"}/products/`
   const busy = Boolean(busySlot) || busyVideo
+  const photosNeededForPublish = Math.max(0, MIN_PHOTOS - filledCount)
+  const canPublish =
+    filledCount >= MIN_PHOTOS && filledCount <= MAX_PHOTOS && !busy && !saving
+  const canSaveDraft = filledCount > 0 && !busy && !saving
+
+  const focusNextRequiredSlot = () => {
+    const nextRequired = PHOTO_SLOTS.findIndex(
+      (slot, index) => !slot.optional && !slots[index]
+    )
+    if (nextRequired < 0) return
+    const el = document.getElementById(
+      `photo-slot-${PHOTO_SLOTS[nextRequired].id}`
+    )
+    el?.scrollIntoView({ behavior: "smooth", block: "center" })
+    el?.classList.add("ring-2", "ring-brand-amber")
+    window.setTimeout(() => {
+      el?.classList.remove("ring-2", "ring-brand-amber")
+    }, 1600)
+  }
 
   return (
     <div className="relative pb-28 text-slate-600">
@@ -676,8 +705,13 @@ export default function ProductUploadForm({
             {PHOTO_SLOTS.map((slot, index) => {
               const image = slots[index]
               const uploading = busySlot === slot.id
+              const requiredEmpty = !slot.optional && !image
               return (
-                <div key={slot.id} className="relative">
+                <div
+                  key={slot.id}
+                  id={`photo-slot-${slot.id}`}
+                  className="relative rounded-xl transition"
+                >
                   <button
                     type="button"
                     disabled={busy}
@@ -685,7 +719,9 @@ export default function ProductUploadForm({
                     className={`group relative flex aspect-[4/3] w-full flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed px-2 text-center transition ${
                       image
                         ? "border-brand-emerald/40 bg-slate-50"
-                        : "border-slate-200 bg-slate-50/60 hover:border-brand-emerald/50 hover:bg-brand-emerald-soft/40"
+                        : requiredEmpty
+                          ? "border-brand-amber/50 bg-brand-amber-soft/40 hover:border-brand-amber"
+                          : "border-slate-200 bg-slate-50/60 hover:border-brand-emerald/50 hover:bg-brand-emerald-soft/40"
                     } ${busy ? "cursor-wait opacity-70" : "cursor-pointer"}`}
                   >
                     {image ? (
@@ -707,6 +743,11 @@ export default function ProductUploadForm({
                         <span className="text-xs font-medium text-slate-600">
                           {slot.label}
                         </span>
+                        {requiredEmpty ? (
+                          <span className="mt-1 text-[10px] font-medium uppercase tracking-wide text-brand-amber">
+                            Required
+                          </span>
+                        ) : null}
                       </>
                     )}
                     {image ? (
@@ -1055,28 +1096,54 @@ export default function ProductUploadForm({
 
       {/* Sticky action bar */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-end gap-3 px-4 py-3 sm:px-0">
-          <button
-            type="button"
-            disabled={Boolean(saving) || busy || !filledCount}
-            onClick={() => void saveProduct(false)}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            {saving === "draft" ? "Saving…" : "Save as Draft"}
-          </button>
-          <button
-            type="button"
-            disabled={
-              Boolean(saving) ||
-              busy ||
-              filledCount < MIN_PHOTOS ||
-              filledCount > MAX_PHOTOS
-            }
-            onClick={() => void saveProduct(true)}
-            className="rounded-lg bg-brand-emerald px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#036647] disabled:opacity-60"
-          >
-            {saving === "publish" ? "Publishing…" : "Publish Piece"}
-          </button>
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="min-w-0 text-xs text-slate-500">
+            {photosNeededForPublish > 0 ? (
+              <button
+                type="button"
+                onClick={focusNextRequiredSlot}
+                className="text-left text-brand-amber hover:underline"
+              >
+                {filledCount}/{MAX_PHOTOS} photos · add {photosNeededForPublish}{" "}
+                more required shot
+                {photosNeededForPublish === 1 ? "" : "s"} to enable Publish
+              </button>
+            ) : (
+              <p className="text-brand-emerald">
+                {filledCount}/{MAX_PHOTOS} photos · ready to publish
+              </p>
+            )}
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              Save as Draft works with 1+ photo. Publish needs {MIN_PHOTOS}–{MAX_PHOTOS}.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!canSaveDraft}
+              onClick={() => void saveProduct(false)}
+              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving === "draft" ? "Saving…" : "Save as Draft"}
+            </button>
+            <button
+              type="button"
+              disabled={!canPublish}
+              onClick={() => void saveProduct(true)}
+              title={
+                canPublish
+                  ? "Publish this piece"
+                  : `Upload at least ${MIN_PHOTOS} photos to publish`
+              }
+              className={`rounded-lg px-5 py-2.5 text-sm font-medium transition ${
+                canPublish
+                  ? "bg-brand-emerald text-white hover:bg-[#036647]"
+                  : "cursor-not-allowed bg-slate-200 text-slate-500"
+              }`}
+            >
+              {saving === "publish" ? "Publishing…" : "Publish Piece"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

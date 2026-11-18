@@ -97,6 +97,23 @@ function isUuid(value: string) {
   )
 }
 
+function isLocalDemoStaffId(value: string) {
+  return Boolean(value) && !isUuid(value)
+}
+
+function isUuidSyntaxError(message?: string | null) {
+  if (!message) return false
+  return /invalid input syntax for type uuid/i.test(message)
+}
+
+function shouldFallbackFromRemote(message?: string | null) {
+  return (
+    isMissingStaffSchemaError(message) ||
+    isUuidSyntaxError(message) ||
+    /staff_(founder|main|ops|artisan|b2b)/i.test(message || "")
+  )
+}
+
 function mapSupabaseProfile(row: {
   id: string
   email?: string | null
@@ -436,6 +453,15 @@ export async function removeStaffMember(userId: string): Promise<
     return { ok: false, code: "VALIDATION", error: "userId is required." }
   }
 
+  if (isLocalDemoStaffId(userId)) {
+    return {
+      ok: false,
+      code: "DB_UNAVAILABLE",
+      error:
+        "Local demo staff id — remove from browser registry, or Add staff via Supabase invite for cloud sync.",
+    }
+  }
+
   const supabase = tryCreateServiceClient()
   if (supabase) {
     try {
@@ -448,6 +474,13 @@ export async function removeStaffMember(userId: string): Promise<
         .maybeSingle()
 
       if (error) {
+        if (shouldFallbackFromRemote(error.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${error.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return { ok: false, code: "UNKNOWN", error: error.message }
       }
       if (!profile) {
@@ -665,12 +698,27 @@ export async function updateStaffRoleAndPermissions(input: {
   ok: boolean
   staff?: StaffMemberDTO
   error?: string
-  code?: "DB_UNAVAILABLE" | "VALIDATION" | "NOT_FOUND" | "UNKNOWN"
+  code?:
+    | "DB_UNAVAILABLE"
+    | "SUPABASE_UNAVAILABLE"
+    | "VALIDATION"
+    | "NOT_FOUND"
+    | "UNKNOWN"
 }> {
   const { userId, newRole, newPermissions = [] } = input || {}
 
   if (!userId) {
     return { ok: false, code: "VALIDATION", error: "userId is required." }
+  }
+
+  // Demo registry ids (staff_main, staff_ops, …) are not auth UUIDs.
+  if (isLocalDemoStaffId(userId)) {
+    return {
+      ok: false,
+      code: "DB_UNAVAILABLE",
+      error:
+        "Local demo staff — saved in browser until you Add staff (Supabase invite) or promote real profiles.",
+    }
   }
 
   const supabase = tryCreateServiceClient()
@@ -685,6 +733,13 @@ export async function updateStaffRoleAndPermissions(input: {
         .maybeSingle()
 
       if (error) {
+        if (shouldFallbackFromRemote(error.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${error.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return { ok: false, code: "UNKNOWN", error: error.message }
       }
       if (!profile) {
@@ -741,6 +796,13 @@ export async function updateStaffRoleAndPermissions(input: {
         .single()
 
       if (updateError || !updated) {
+        if (shouldFallbackFromRemote(updateError?.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${updateError?.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return {
           ok: false,
           code: "UNKNOWN",
@@ -757,13 +819,21 @@ export async function updateStaffRoleAndPermissions(input: {
       revalidateStaffPaths()
       return { ok: true, staff: toStaffDTO(mapped, "supabase") }
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update staff member."
+      if (shouldFallbackFromRemote(message)) {
+        return {
+          ok: false,
+          code: "SUPABASE_UNAVAILABLE",
+          error: `${message}. ${STAFF_MIGRATION_HINT}`,
+        }
+      }
       return {
         ok: false,
         code: "UNKNOWN",
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update staff member.",
+        error: message,
       }
     }
   }

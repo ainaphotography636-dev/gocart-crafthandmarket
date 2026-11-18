@@ -116,7 +116,14 @@ export default function AdminStaffPage() {
         return result.staff
       }
 
-      if (result.code === "DB_UNAVAILABLE") {
+      const fallbackLocal =
+        result.code === "DB_UNAVAILABLE" ||
+        result.code === "SUPABASE_UNAVAILABLE" ||
+        /invalid input syntax for type uuid|staff_(founder|main|ops|artisan|b2b)|Local demo/i.test(
+          result.error || ""
+        )
+
+      if (fallbackLocal) {
         const defaults = getPermissionsForRole(newRole)
         const sameAsDefaults =
           defaults.length === newPermissions.length &&
@@ -129,7 +136,9 @@ export default function AdminStaffPage() {
         setSource("local")
         if (closeModal) setEditingId(null)
         toast.success(
-          "Saved locally (connect Supabase service role / DATABASE_URL to persist)"
+          /staff_|Local demo|uuid/i.test(result.error || "")
+            ? "Saved locally — demo staff ids are not Supabase UUIDs. Use Add staff to invite real accounts."
+            : "Saved locally (run staff migration + Add staff for Supabase sync)"
         )
         return null
       }
@@ -137,8 +146,26 @@ export default function AdminStaffPage() {
       toast.error(result.error || "Could not update staff member.")
       return null
     } catch (error) {
-      toast.error(error?.message || "Could not update staff member.")
-      return null
+      try {
+        const defaults = getPermissionsForRole(newRole)
+        const sameAsDefaults =
+          defaults.length === newPermissions.length &&
+          defaults.every((permission) => newPermissions.includes(permission))
+        applyLocalUpdate(
+          userId,
+          newRole,
+          sameAsDefaults ? [] : newPermissions
+        )
+        setSource("local")
+        if (closeModal) setEditingId(null)
+        toast.success("Saved locally")
+        return null
+      } catch (localError) {
+        toast.error(
+          localError?.message || error?.message || "Could not update staff member."
+        )
+        return null
+      }
     } finally {
       setSavingId("")
     }
@@ -391,6 +418,19 @@ export default function AdminStaffPage() {
           Add staff
         </button>
       </div>
+
+      {source === "local" ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Using local demo staff</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
+            Role/permission edits save in your browser for demo ids like{" "}
+            <code>staff_main</code>. To sync with Supabase: run{" "}
+            <code>20261118_staff_admin_profiles.sql</code>, set{" "}
+            <code>SUPABASE_SERVICE_ROLE_KEY</code>, promote your founder, then use{" "}
+            <strong>Add staff</strong> to invite real accounts (UUID profiles).
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-3 md:grid-cols-5">
         {ROLE_HIERARCHY.map((role, index) => (

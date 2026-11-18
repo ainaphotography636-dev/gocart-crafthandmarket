@@ -483,3 +483,211 @@ export async function createMarketplaceProduct(
     },
   }
 }
+
+/**
+ * Update an existing marketplace product owned by the signed-in artisan.
+ */
+export async function updateMarketplaceProduct(input: {
+  productId: string
+  title?: string
+  description?: string
+  category?: string
+  priceInr?: number
+  mrpInr?: number | null
+  stockQuantity?: number | null
+  images?: string[]
+  videoProofUrl?: string | null
+  inStock?: boolean
+  specs?: HandicraftSpecs | null
+}): Promise<MarketplaceActionResult> {
+  if (!isSupabaseConfigured()) {
+    return {
+      ok: false,
+      code: "SUPABASE_UNAVAILABLE",
+      error: "Supabase is not configured.",
+    }
+  }
+
+  const productId = String(input?.productId || "").trim()
+  if (!productId) {
+    return { ok: false, code: "VALIDATION", error: "productId is required." }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return {
+      ok: false,
+      code: "UNAUTHORIZED",
+      error: "Sign in as an artisan to update marketplace products.",
+    }
+  }
+
+  const { data: artisan, error: artisanError } = await supabase
+    .from("artisans")
+    .select("id, artisan_code, username, workshop_name, verification_status, is_active")
+    .eq("profile_id", user.id)
+    .maybeSingle()
+
+  if (artisanError || !artisan) {
+    return {
+      ok: false,
+      code: "ARTISAN",
+      error: artisanError?.message || "Artisan workshop not found.",
+    }
+  }
+
+  const { data: existing, error: lookupError } = await supabase
+    .from("products")
+    .select("id, sku, title, artisan_id, is_published, images, specs")
+    .eq("id", productId)
+    .eq("artisan_id", artisan.id)
+    .maybeSingle()
+
+  if (lookupError || !existing) {
+    return {
+      ok: false,
+      code: "INSERT",
+      error: lookupError?.message || "Product not found for this workshop.",
+    }
+  }
+
+  const images = Array.isArray(input.images)
+    ? input.images.map((url) => String(url || "").trim()).filter(Boolean)
+    : null
+  if (images) {
+    if (!images.length) {
+      return { ok: false, code: "VALIDATION", error: "Keep at least one product photo." }
+    }
+    if (images.length > 6) {
+      return { ok: false, code: "VALIDATION", error: "Upload at most 6 product photos." }
+    }
+  }
+
+  const specs = input.specs || {}
+  const existingSpecs =
+    existing.specs && typeof existing.specs === "object" && !Array.isArray(existing.specs)
+      ? (existing.specs as Record<string, unknown>)
+      : {}
+
+  const stockQuantity =
+    input.stockQuantity === undefined || input.stockQuantity === null
+      ? null
+      : Number(input.stockQuantity)
+
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.title !== undefined) patch.title = String(input.title || "").trim()
+  if (input.description !== undefined) {
+    patch.description = String(input.description || "").trim()
+  }
+  if (input.category !== undefined) patch.category = String(input.category || "").trim()
+  if (input.priceInr !== undefined) {
+    const priceInr = Number(input.priceInr)
+    if (!Number.isFinite(priceInr) || priceInr <= 0) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid offer price (₹)." }
+    }
+    patch.price_inr = priceInr
+    patch.price_usd = priceInr
+  }
+  if (input.mrpInr !== undefined) {
+    const mrpInr =
+      input.mrpInr === null ? null : Number(input.mrpInr)
+    if (mrpInr !== null && (!Number.isFinite(mrpInr) || mrpInr <= 0)) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid actual price (₹)." }
+    }
+    patch.mrp_inr = mrpInr
+    patch.mrp_usd = mrpInr
+  }
+  if (images) patch.images = images
+  if (Object.prototype.hasOwnProperty.call(input, "videoProofUrl")) {
+    patch.video_proof_url = input.videoProofUrl || null
+  }
+  if (input.inStock !== undefined) patch.in_stock = Boolean(input.inStock)
+  if (stockQuantity !== null) {
+    if (!Number.isFinite(stockQuantity) || stockQuantity < 0) {
+      return { ok: false, code: "VALIDATION", error: "Enter a valid stock quantity." }
+    }
+    patch.in_stock = stockQuantity > 0
+  }
+
+  if (input.specs) {
+    patch.material = String(specs.material || "").trim() || null
+    patch.craft_technique = String(specs.craftTechnique || "").trim() || null
+    patch.dimensions = String(specs.dimensions || "").trim() || null
+    patch.region_origin = String(specs.regionOrigin || "").trim() || null
+    patch.weight = String(specs.weight || "").trim() || null
+    patch.care_instructions = String(specs.careInstructions || "").trim() || null
+    patch.gi_tag = String(specs.giTag || "").trim() || null
+    patch.specs = {
+      ...existingSpecs,
+      material: patch.material,
+      craftTechnique: patch.craft_technique,
+      dimensions: patch.dimensions,
+      regionOrigin: patch.region_origin,
+      weight: patch.weight,
+      careInstructions: patch.care_instructions,
+      giTag: patch.gi_tag,
+      stockQuantity:
+        stockQuantity !== null
+          ? stockQuantity
+          : existingSpecs.stockQuantity ?? null,
+      custom: Array.isArray(specs.custom) ? specs.custom : existingSpecs.custom || [],
+    }
+  } else if (stockQuantity !== null) {
+    patch.specs = {
+      ...existingSpecs,
+      stockQuantity,
+    }
+  }
+
+  const { data: product, error: updateError } = await supabase
+    .from("products")
+    .update(patch)
+    .eq("id", productId)
+    .eq("artisan_id", artisan.id)
+    .select("id, sku, title, artisan_id, is_published")
+    .single()
+
+  if (updateError || !product) {
+    return {
+      ok: false,
+      code: "INSERT",
+      error: updateError?.message || "Could not update product.",
+    }
+  }
+
+  const artisanCode = normalizeArtisanCode(artisan.artisan_code)
+  revalidatePath("/shop")
+  revalidatePath("/store")
+  revalidatePath("/store/manage-product")
+  revalidatePath(`/shop/${artisan.username}`)
+  revalidatePath(`/product/${product.id}`)
+
+  return {
+    ok: true,
+    source: "supabase",
+    product: {
+      id: product.id,
+      sku: product.sku,
+      title: product.title,
+      artisanId: product.artisan_id,
+      artisanCode,
+      isPublished: product.is_published,
+    },
+    artisan: {
+      id: artisan.id,
+      artisanCode,
+      username: artisan.username,
+      workshopName: artisan.workshop_name,
+      verificationStatus: artisan.verification_status,
+      isActive: artisan.is_active,
+    },
+  }
+}

@@ -7,26 +7,20 @@ import LogisticsBand from "@/components/public/LogisticsBand"
 import HomeCatalogClient from "@/components/public/HomeCatalogClient"
 import CatalogHydrator from "@/components/marketplace/CatalogHydrator"
 import CatalogMediaBridge from "@/components/marketplace/CatalogMediaBridge"
-import {
-  listStorefrontArtisans,
-  listStorefrontProducts,
-} from "@/lib/marketplace/catalog"
+import { listStorefrontProducts } from "@/lib/marketplace/catalog"
 
 export default async function Home() {
-  const [recent, artisans] = await Promise.all([
-    listStorefrontProducts({
-      limit: 8,
-      requireInStock: false,
-    }),
-    listStorefrontArtisans({ limit: 6 }),
-  ])
+  const recent = await listStorefrontProducts({
+    limit: 8,
+    requireInStock: false,
+  })
 
   return (
     <div>
       <CatalogHydrator products={recent.items} replace />
       <CatalogMediaBridge products={recent.items} />
       <Hero />
-      <HomeCatalogClient products={recent.items} artisans={artisans.items} />
+      <HomeCatalogClient products={recent.items} />
       <GuaranteeStrip />
       <HeritageStory />
       <LogisticsBand />

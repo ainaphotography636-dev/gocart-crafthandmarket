@@ -1,4 +1,8 @@
-import { resolveMediaUrl, resolveMediaUrls } from "@/lib/marketplace/media"
+import {
+  getProductImageUrls,
+  getProductVideoUrl,
+  resolveMediaUrl,
+} from "@/lib/marketplace/media"
 import type { StorefrontArtisan, StorefrontProduct } from "@/lib/marketplace/types"
 
 type ArtisanRow = {
@@ -35,8 +39,10 @@ type ProductRow = {
   price_usd: number | string
   mrp_usd: number | string | null
   currency_default: string | null
-  images: string[] | null
-  video_proof_url: string | null
+  images?: string[] | null
+  image_urls?: string[] | null
+  video_proof_url?: string | null
+  item_video_url?: string | null
   in_stock: boolean
   is_published: boolean
   created_at: string | null
@@ -79,8 +85,8 @@ export function mapProductRow(row: ProductRow): StorefrontProduct {
   const artisan = asSingleArtisan(row.artisans)
   const price = firstPositiveNumber(row.price_inr, row.price_usd)
   const mrp = firstPositiveNumber(row.mrp_inr, row.mrp_usd, price)
-  const images = resolveMediaUrls(row.images)
-  const video = resolveMediaUrl(row.video_proof_url)
+  const images = getProductImageUrls(row)
+  const video = getProductVideoUrl(row)
   const specs =
     row.specs && typeof row.specs === "object" && !Array.isArray(row.specs)
       ? row.specs

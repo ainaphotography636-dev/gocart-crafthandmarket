@@ -26,7 +26,7 @@ const OrderItem = ({ order }) => {
                                 <div className="w-20 aspect-square bg-slate-100 flex items-center justify-center rounded-md">
                                     <Image
                                         className="h-14 w-auto"
-                                        src={item.product.images[0]}
+                                        src={item.product.image_urls?.[0] || item.product.images?.[0] || "/upload_area.png"}
                                         alt="product_img"
                                         width={50}
                                         height={50}

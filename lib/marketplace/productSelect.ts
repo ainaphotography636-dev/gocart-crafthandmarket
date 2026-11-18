@@ -41,7 +41,9 @@ export const PRODUCT_SELECT_FULL = `
   mrp_usd,
   currency_default,
   images,
+  image_urls,
   video_proof_url,
+  item_video_url,
   in_stock,
   is_published,
   created_at,
@@ -49,8 +51,7 @@ export const PRODUCT_SELECT_FULL = `
 `
 
 /**
- * Columns confirmed on the current production marketplace schema
- * (craft_technique + dimensions exist; INR/specs/weight do not yet).
+ * Compatible select when newer media alias columns are absent.
  */
 export const PRODUCT_SELECT_COMPAT = `
   id,
@@ -78,7 +79,7 @@ export function isMissingColumnError(error: { message?: string } | null | undefi
   return /column .* does not exist/i.test(String(error?.message || ""))
 }
 
-/** Strip optional INR/spec columns for DBs that have not run the migration. */
+/** Strip optional INR/spec/media-alias columns for older schemas. */
 export function toCompatProductRow<T extends Record<string, unknown>>(row: T) {
   const {
     weight: _w,
@@ -87,6 +88,8 @@ export function toCompatProductRow<T extends Record<string, unknown>>(row: T) {
     specs: _specs,
     price_inr: _pi,
     mrp_inr: _mi,
+    image_urls: _iu,
+    item_video_url: _iv,
     ...compat
   } = row
   return compat

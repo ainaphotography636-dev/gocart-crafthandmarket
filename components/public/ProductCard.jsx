@@ -5,6 +5,7 @@ import React from 'react'
 import SafeImage from '@/components/shared/SafeImage'
 import { useCurrency } from '@/components/shared/CurrencyProvider'
 import { formatProductTitle } from '@/lib/productCodes'
+import { getProductThumbnailUrl } from '@/lib/marketplace/media'
 
 const ProductCard = ({ product }) => {
     const { currency } = useCurrency()
@@ -13,7 +14,7 @@ const ProductCard = ({ product }) => {
     const rating = ratings.length
         ? Math.round(ratings.reduce((acc, curr) => acc + Number(curr.rating || 0), 0) / ratings.length)
         : 0
-    const image = Array.isArray(product?.images) && product.images[0] ? product.images[0] : null
+    const image = getProductThumbnailUrl(product)
 
     return (
         <Link href={`/product/${product.id}`} className=' group max-xl:mx-auto'>

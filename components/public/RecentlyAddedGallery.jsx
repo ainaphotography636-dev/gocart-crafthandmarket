@@ -5,6 +5,7 @@ import Title from './Title'
 import SafeImage from '@/components/shared/SafeImage'
 import { useCurrency } from '@/components/shared/CurrencyProvider'
 import { formatProductTitle } from '@/lib/productCodes'
+import { getProductThumbnailUrl } from '@/lib/marketplace/media'
 
 function stockLabel(product) {
   const qty = Number(product?.specs?.stockQuantity)
@@ -18,8 +19,7 @@ function stockLabel(product) {
 function GalleryCard({ product }) {
   const { currency } = useCurrency()
   const currencySymbol = currency.symbol
-  const image =
-    Array.isArray(product?.images) && product.images[0] ? product.images[0] : null
+  const image = getProductThumbnailUrl(product)
   const material = String(product?.material || '').trim()
   const dimensions = String(product?.dimensions || '').trim()
   const inStock = Boolean(product?.inStock)

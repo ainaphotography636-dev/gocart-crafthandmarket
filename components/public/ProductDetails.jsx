@@ -9,7 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useAuth } from "@/components/auth/AuthProvider";
 import SafeImage from "@/components/shared/SafeImage";
 import { useCurrency } from "@/components/shared/CurrencyProvider";
-import { MEDIA_PLACEHOLDER } from "@/lib/marketplace/media";
+import { getProductImageUrls, MEDIA_PLACEHOLDER } from "@/lib/marketplace/media";
 import { formatProductTitle } from "@/lib/productCodes";
 
 const ProductDetails = ({ product }) => {
@@ -23,9 +23,9 @@ const ProductDetails = ({ product }) => {
     const router = useRouter()
 
     const images = useMemo(() => {
-        const list = Array.isArray(product?.images) ? product.images.filter(Boolean) : []
+        const list = getProductImageUrls(product)
         return list.length ? list : [MEDIA_PLACEHOLDER]
-    }, [product?.images])
+    }, [product])
 
     const [mainImage, setMainImage] = useState(images[0]);
 

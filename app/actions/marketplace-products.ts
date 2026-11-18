@@ -460,6 +460,8 @@ export async function createMarketplaceProduct(
   revalidatePath("/shop")
   revalidatePath("/artisan/products/new")
   revalidatePath("/store")
+  revalidatePath("/store/add-product")
+  revalidatePath("/store/manage-product")
   revalidatePath(`/shop/${artisan.username}`)
 
   return {
@@ -482,6 +484,70 @@ export async function createMarketplaceProduct(
       isActive: artisan.is_active,
     },
   }
+}
+
+/**
+ * Form-facing server action for "Add New Handicraft Piece".
+ * Accepts artisan form field names and maps them onto the products table
+ * via createMarketplaceProduct (images[] + video_proof_url).
+ */
+export type PublishHandicraftProductInput = {
+  title: string
+  category: string
+  description: string
+  /** Actual / MRP price in INR */
+  actualPrice: number
+  /** Offer / selling price in INR */
+  offerPrice: number
+  stockQuantity: number
+  primaryMaterial?: string | null
+  craftTechnique?: string | null
+  dimensions?: string | null
+  originRegion?: string | null
+  /** Public Cloudflare R2 image URLs (4–6 for publish, 1+ for draft) */
+  image_urls: string[]
+  /** Optional public R2 craft-video URL */
+  item_video_url?: string | null
+  /** When true, attempt is_published (requires verified workshop + 4 photos) */
+  isPublished?: boolean
+  sku?: string | null
+  workshopName?: string | null
+  username?: string | null
+  artisanCode?: string | null
+  customSpecs?: CustomSpec[] | null
+}
+
+export async function publishHandicraftProduct(
+  input: PublishHandicraftProductInput
+): Promise<MarketplaceActionResult> {
+  const imageUrls = Array.isArray(input?.image_urls)
+    ? input.image_urls
+    : []
+  const isPublished = Boolean(input?.isPublished)
+
+  return createMarketplaceProduct({
+    title: input.title,
+    category: input.category,
+    description: input.description,
+    priceInr: Number(input.offerPrice),
+    mrpInr: Number(input.actualPrice),
+    stockQuantity: Number(input.stockQuantity),
+    images: imageUrls,
+    videoProofUrl: input.item_video_url || null,
+    publish: isPublished,
+    sku: input.sku,
+    workshopName: input.workshopName,
+    username: input.username,
+    artisanCode: input.artisanCode,
+    specs: {
+      material: input.primaryMaterial,
+      craftTechnique: input.craftTechnique,
+      dimensions: input.dimensions,
+      regionOrigin: input.originRegion,
+      stockQuantity: Number(input.stockQuantity),
+      custom: input.customSpecs || [],
+    },
+  })
 }
 
 /**

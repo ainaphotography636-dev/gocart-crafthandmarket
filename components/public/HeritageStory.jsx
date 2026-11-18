@@ -5,7 +5,7 @@ import { assets } from '@/assets/assets'
 
 export default function HeritageStory() {
   return (
-    <section className="bg-brand-cream">
+    <section id="mission" className="scroll-mt-24 bg-brand-cream">
       <div className="mx-auto grid max-w-7xl items-center gap-10 px-6 py-16 sm:px-8 sm:py-20 lg:grid-cols-2 lg:gap-14">
         <div className="relative aspect-[4/5] overflow-hidden bg-brand-forest/5 sm:aspect-[5/4] lg:aspect-[4/5]">
           <Image
@@ -19,7 +19,7 @@ export default function HeritageStory() {
 
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
-            Our Purpose
+            Mission
           </p>
           <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl leading-tight text-brand-slate sm:text-4xl">
             Bridging Rural Heritage Workshops and Global Buyers

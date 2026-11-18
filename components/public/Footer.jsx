@@ -12,8 +12,12 @@ const Footer = () => {
             <div className="mx-auto max-w-7xl px-6 py-14 sm:px-8">
                 <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3 lg:gap-14">
                     <div>
-                        <p className="font-[family-name:var(--font-display)] text-2xl text-white">
-                            CraftHand Market
+                        <p className="text-2xl font-bold tracking-tight">
+                            <span className="text-brand-terracotta">Craft</span>
+                            <span className="text-white">hand</span>
+                            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-emerald-light">
+                              Market
+                            </span>
                         </p>
                         <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/65">
                             Direct from verified artisans to the world — video proof,

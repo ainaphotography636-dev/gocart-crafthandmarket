@@ -122,6 +122,8 @@ These files match **Supabase Connect → Framework → Next.js → App Router**:
 
 **Storefront visibility:** artisans need `verification_status = verified` and `is_active = true`; products need `is_published = true` and `in_stock = true`.
 
+**Required follow-up migration:** run `20261117_product_inr_specs.sql` in the Supabase SQL editor if the shop shows `column products.weight does not exist` (or missing `price_inr` / `specs`). The app falls back to a compatible select/insert without those columns, but INR-specific fields will only persist after the migration.
+
 Until Supabase keys are set, protected-route redirects are skipped so local
 workshop flows (localStorage) keep working.
 

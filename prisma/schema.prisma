@@ -61,6 +61,8 @@ model User {
   permissions String[] @default([])
   /// Marks the single locked founder Super Admin account.
   isFounder   Boolean  @default(false)
+  /// Short staff bio / portfolio blurb for the admin directory.
+  portfolio   String   @default("")
 
   // Relations
   ratings     Rating[]

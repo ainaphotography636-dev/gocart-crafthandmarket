@@ -37,13 +37,32 @@ Restart the Next.js dev server after changing env vars.
 
    - `supabase/migrations/20261117_marketplace_schema.sql`
    - `supabase/migrations/20261117_client_role.sql` (adds `client` role; keeps legacy `buyer`)
+   - `supabase/migrations/20261117_product_inr_specs.sql` (INR pricing + handicraft specs)
+   - `supabase/migrations/20261118_staff_admin_profiles.sql` (staff admin_role / permissions / portfolio)
 
 3. Confirm tables exist under **Table Editor**:
-   - `profiles`
+   - `profiles` (with `admin_role`, `permissions`, `is_founder`, `portfolio`)
    - `artisans`
    - `products`
    - `orders`
    - `order_items`
+
+### Promote the founder Super Admin
+
+After your founder account signs up, mark them as the locked Super Admin (exactly one):
+
+```sql
+update public.profiles
+set
+  role = 'admin',
+  admin_role = 'SUPER_ADMIN',
+  permissions = array['*'],
+  is_founder = true,
+  portfolio = coalesce(nullif(portfolio, ''), 'Founder Super Admin')
+where email = 'YOUR_FOUNDER_EMAIL@example.com';
+```
+
+`/admin/staff` then lists Supabase staff profiles. Super Admin can **Add staff** (Auth invite), **Remove**, and **Edit profile** (name + portfolio).
 
 The scripts are idempotent where possible (`IF NOT EXISTS`, `OR REPLACE`).
 

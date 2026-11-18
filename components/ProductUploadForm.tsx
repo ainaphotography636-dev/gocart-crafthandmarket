@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   useCallback,
   useEffect,
@@ -21,7 +22,7 @@ import {
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import {
-  createMarketplaceProduct,
+  publishHandicraftProduct,
   type CustomSpec,
 } from "@/app/actions/marketplace-products"
 import { ARTISAN_CATEGORIES, addProduct } from "@/lib/productCatalog"
@@ -169,6 +170,7 @@ export default function ProductUploadForm({
   artisanId: artisanIdProp,
   onComplete,
 }: ProductUploadFormProps = {}) {
+  const router = useRouter()
   const videoInputId = useId()
   const slotInputRefs = useRef<Array<HTMLInputElement | null>>([])
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -499,53 +501,56 @@ export default function ProductUploadForm({
         setProductId(sku)
       }
 
-      const name = String(productInfo.name || "").trim()
+      const title = String(productInfo.name || "").trim()
       const description = String(productInfo.description || "").trim()
       const category = String(productInfo.category || "").trim()
-      const mrp = Number(productInfo.mrp)
-      const price = Number(productInfo.price)
-      const stockQty = Number.parseInt(String(productInfo.stock), 10)
+      const actualPrice = Number(productInfo.mrp)
+      const offerPrice = Number(productInfo.price)
+      const stockQuantity = Number.parseInt(String(productInfo.stock), 10)
+      const primaryMaterial = String(productInfo.material || "").trim()
+      const craftTechnique = String(productInfo.craftTechnique || "").trim()
+      const dimensions = String(productInfo.dimensions || "").trim()
+      const originRegion = String(productInfo.regionOrigin || "").trim()
 
-      if (!name) throw new Error("Product title is required.")
+      if (!title) throw new Error("Product title is required.")
       if (!description) throw new Error("Story & description is required.")
       if (!category) throw new Error("Select a craft category.")
-      if (!Number.isFinite(mrp) || mrp <= 0) {
+      if (!Number.isFinite(actualPrice) || actualPrice <= 0) {
         throw new Error("Enter a valid actual price (₹).")
       }
-      if (!Number.isFinite(price) || price <= 0) {
+      if (!Number.isFinite(offerPrice) || offerPrice <= 0) {
         throw new Error("Enter a valid offer price (₹).")
       }
-      if (price > mrp) {
+      if (offerPrice > actualPrice) {
         throw new Error("Offer price cannot be higher than actual price.")
       }
-      if (!Number.isFinite(stockQty) || stockQty < 0) {
+      if (!Number.isFinite(stockQuantity) || stockQuantity < 0) {
         throw new Error("Enter a valid stock quantity.")
       }
 
-      const imageUrls = filledImages.map((item) => item.url)
-      const videoUrl = video?.url || null
+      // R2 public URLs collected as photos/videos upload into the dropzones.
+      const image_urls = filledImages.map((item) => item.url)
+      const item_video_url = video?.url || null
 
-      const persisted = await createMarketplaceProduct({
-        title: name,
-        description,
+      const persisted = await publishHandicraftProduct({
+        title,
         category,
-        priceInr: price,
-        mrpInr: mrp,
-        stockQuantity: stockQty,
-        images: imageUrls,
-        videoProofUrl: videoUrl,
+        description,
+        actualPrice,
+        offerPrice,
+        stockQuantity,
+        primaryMaterial,
+        craftTechnique,
+        dimensions,
+        originRegion,
+        image_urls,
+        item_video_url,
+        isPublished: publish,
         sku,
         workshopName: store.name,
         username: store.username,
         artisanCode,
-        publish,
-        specs: {
-          material: productInfo.material,
-          craftTechnique: productInfo.craftTechnique,
-          dimensions: productInfo.dimensions,
-          regionOrigin: productInfo.regionOrigin,
-          custom: customSpecs,
-        },
+        customSpecs,
       })
 
       const now = new Date().toISOString()
@@ -556,16 +561,20 @@ export default function ProductUploadForm({
         artisanCode: persisted.ok ? persisted.product.artisanCode : artisanCode,
         sku: persisted.ok ? persisted.product.sku : sku,
         skuSequence,
-        name,
+        name: title,
         description,
-        mrp,
-        price,
-        stock: stockQty,
+        mrp: actualPrice,
+        price: offerPrice,
+        stock: stockQuantity,
         category,
-        images: imageUrls,
-        video: videoUrl,
+        material: primaryMaterial,
+        craftTechnique,
+        dimensions,
+        regionOrigin: originRegion,
+        images: image_urls,
+        video: item_video_url,
         mediaStorage: "r2" as const,
-        inStock: stockQty > 0,
+        inStock: stockQuantity > 0,
         rating: [],
         createdAt: now,
         updatedAt: now,
@@ -577,6 +586,10 @@ export default function ProductUploadForm({
       addProduct(product)
 
       if (persisted.ok === false) {
+        if (persisted.code === "VALIDATION") {
+          toast.error(persisted.error)
+          return
+        }
         if (persisted.code === "UNAUTHORIZED") {
           toast.success(
             `${formatProductTitle(product)} saved to workshop catalog — sign in to sync to Supabase`
@@ -585,9 +598,6 @@ export default function ProductUploadForm({
           toast.success(
             `${formatProductTitle(product)} saved to workshop catalog`
           )
-        } else if (persisted.code === "VALIDATION") {
-          toast.error(persisted.error)
-          return
         } else {
           // Keep a local copy even when cloud insert fails (e.g. missing migration).
           toast.success(
@@ -595,20 +605,25 @@ export default function ProductUploadForm({
           )
         }
         resetForm(store.artisanCode || artisanCode)
-      } else {
-        if (publish && !persisted.product.isPublished) {
-          toast.success(
-            `${formatProductTitle(product)} saved as draft — workshop must be verified before public listing`
-          )
-        } else {
-          toast.success(
-            publish
-              ? `${formatProductTitle(product)} published — media on Cloudflare R2`
-              : `${formatProductTitle(product)} saved as draft`
-          )
-        }
-        resetForm(persisted.product.artisanCode)
+        router.push("/store")
+        router.refresh()
+        return
       }
+
+      if (publish && !persisted.product.isPublished) {
+        toast.success(
+          `${formatProductTitle(product)} saved as draft — workshop must be verified before public listing`
+        )
+      } else {
+        toast.success(
+          publish
+            ? `${formatProductTitle(product)} published — media on Cloudflare R2`
+            : `${formatProductTitle(product)} saved as draft`
+        )
+      }
+      resetForm(persisted.product.artisanCode)
+      router.push("/store")
+      router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save product")
     } finally {

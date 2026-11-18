@@ -56,12 +56,14 @@ export type CatalogListResult<T> = {
 }
 
 /**
- * Published, in-stock products for the public shop grid.
- * Relies on RLS: `is_published = true and in_stock = true`.
+ * Published products for the public storefront.
+ * Defaults to in-stock only (shop grid). Pass `requireInStock: false`
+ * for homepage "Recently Added" so stock status can be shown.
  */
 export async function listStorefrontProducts(options?: {
   search?: string | null
   limit?: number
+  requireInStock?: boolean
 }): Promise<CatalogListResult<StorefrontProduct>> {
   if (!isSupabaseConfigured()) {
     return { items: [], source: "unavailable" }
@@ -69,12 +71,16 @@ export async function listStorefrontProducts(options?: {
 
   try {
     const supabase = await createClient()
+    const requireInStock = options?.requireInStock !== false
     let query = supabase
       .from("products")
       .select(PRODUCT_SELECT)
       .eq("is_published", true)
-      .eq("in_stock", true)
       .order("created_at", { ascending: false })
+
+    if (requireInStock) {
+      query = query.eq("in_stock", true)
+    }
 
     if (options?.limit) {
       query = query.limit(options.limit)

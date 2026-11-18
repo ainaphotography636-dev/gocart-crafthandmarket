@@ -83,75 +83,75 @@ export default function LuxuryProductCard({ product }) {
   const breadcrumb = `${category.toUpperCase()} › ${technique.toUpperCase()}`
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_12px_40px_-24px_rgba(30,41,59,0.35)] ring-1 ring-slate-200/70">
-      <div className="relative flex aspect-[5/4] items-center justify-center overflow-hidden bg-[#f3ebe4]">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-[0_10px_28px_-20px_rgba(30,41,59,0.4)] ring-1 ring-slate-200/70">
+      <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-[#f3ebe4]">
         {image ? (
           <SafeImage
-            width={720}
-            height={560}
+            width={560}
+            height={420}
             className="absolute inset-0 h-full w-full object-cover"
             src={image}
             alt={title}
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#f3ebe4]/90 via-[#f3ebe4]/25 to-transparent" />
-        <span className="absolute left-3 top-3 rounded-full bg-brand-slate px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#e8c87a]">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#f3ebe4]/90 via-[#f3ebe4]/20 to-transparent" />
+        <span className="absolute left-2 top-2 max-w-[48%] truncate rounded-full bg-brand-slate px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-[#e8c87a]">
           {accentBadge(product)}
         </span>
-        <span className="absolute right-3 top-3 rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-brand-slate shadow-sm">
+        <span className="absolute right-2 top-2 rounded-full bg-white px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.06em] text-brand-slate shadow-sm">
           {stockBadge(product)}
         </span>
-        <p className="relative z-10 max-w-[85%] px-4 text-center font-[family-name:var(--font-display)] text-2xl leading-tight text-brand-terracotta sm:text-[1.65rem]">
+        <p className="relative z-10 max-w-[90%] px-3 text-center font-[family-name:var(--font-display)] text-lg leading-tight text-brand-terracotta sm:text-xl">
           {displayName}
         </p>
       </div>
 
-      <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-terracotta">
+      <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
+        <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-brand-terracotta">
           {breadcrumb}
         </p>
-        <h3 className="mt-2 text-base font-bold leading-snug text-brand-slate line-clamp-2">
+        <h3 className="mt-1.5 text-sm font-bold leading-snug text-brand-slate line-clamp-2">
           <Link href={`/product/${product.id}`} className="hover:text-brand-terracotta transition">
             {title}
           </Link>
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500 line-clamp-3">
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500 line-clamp-2">
           {shortDescription(product)}
         </p>
 
-        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
-          <div>
+        <dl className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-slate-100 pt-2 text-[10px]">
+          <div className="truncate">
             <dt className="inline font-semibold text-brand-slate">Technique: </dt>
             <dd className="inline text-slate-500">{technique}</dd>
           </div>
-          <div>
+          <div className="truncate">
             <dt className="inline font-semibold text-brand-slate">Origin: </dt>
             <dd className="inline text-slate-500">{origin}</dd>
           </div>
-          <div>
+          <div className="truncate">
             <dt className="inline font-semibold text-brand-slate">Dimensions: </dt>
             <dd className="inline text-slate-500">{dimensions}</dd>
           </div>
-          <div>
+          <div className="truncate">
             <dt className="inline font-semibold text-brand-slate">Weight: </dt>
             <dd className="inline text-slate-500">{weight}</dd>
           </div>
         </dl>
 
-        <div className="mt-auto flex items-end justify-between gap-3 pt-5">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+          <div className="min-w-0">
+            <p className="text-[9px] font-medium uppercase tracking-[0.12em] text-slate-400">
               Collector Price
             </p>
-            <p className="mt-0.5 text-xl font-bold text-brand-slate">
+            <p className="mt-0.5 truncate text-base font-bold text-brand-slate">
               {formatPrice(product.price, currency)}
             </p>
           </div>
           <Link
             href={`/product/${product.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-slate px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-brand-terracotta"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-slate px-2.5 py-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-white transition hover:bg-brand-terracotta"
           >
-            <Lock size={12} />
+            <Lock size={11} />
             Secure Piece
           </Link>
         </div>

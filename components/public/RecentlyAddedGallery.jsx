@@ -33,13 +33,13 @@ export default function RecentlyAddedGallery({ products = [] }) {
       id="masterpieces"
       className="scroll-mt-24 bg-brand-cream px-6 py-16 sm:px-8 sm:py-20"
     >
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mx-auto max-w-[90rem]">
+        <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-terracotta">
               Exquisite Catalog
             </p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-brand-slate sm:text-4xl">
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-brand-slate sm:text-3xl">
               Featured Luxury Handicrafts
             </h2>
           </div>
@@ -87,8 +87,8 @@ export default function RecentlyAddedGallery({ products = [] }) {
             .
           </div>
         ) : (
-          <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((product) => (
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {filtered.slice(0, 4).map((product) => (
               <LuxuryProductCard key={product.id} product={product} />
             ))}
           </div>

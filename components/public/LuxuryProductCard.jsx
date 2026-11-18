@@ -26,6 +26,7 @@ function meta(value, fallback = '—') {
 }
 
 function stockBadge(product) {
+  if (product?.specs?.series) return String(product.specs.series)
   const qty = Number(product?.specs?.stockQuantity)
   if (Number.isFinite(qty) && qty > 0 && qty <= 3) return 'Limited Series'
   if (product?.inStock === false || qty === 0) return 'Waitlist'
@@ -34,9 +35,15 @@ function stockBadge(product) {
 }
 
 function accentBadge(product) {
-  if (product?.giTag) return String(product.giTag).toUpperCase().includes('GI')
-    ? 'GI-TAG CERTIFIED'
-    : String(product.giTag).toUpperCase()
+  if (product?.specs?.badge) return String(product.specs.badge)
+  if (product?.giTag) {
+    const tag = String(product.giTag)
+    return /kannadi|gi|handloom|saree/i.test(tag)
+      ? tag.toUpperCase().includes('GI')
+        ? 'GI-TAG CERTIFIED'
+        : `${tag.toUpperCase()}`
+      : tag.toUpperCase()
+  }
   if (product?.material) return String(product.material).toUpperCase()
   if (product?.category) return String(product.category).toUpperCase()
   return 'WORKSHOP CODED'
@@ -62,7 +69,12 @@ export default function LuxuryProductCard({ product }) {
   const { currency } = useCurrency()
   const image = getProductThumbnailUrl(product)
   const title = formatProductTitle(product)
-  const displayName = String(product?.name || product?.title || title).trim()
+  const displayName = String(
+    product?.specs?.displayName ||
+      product?.name ||
+      product?.title ||
+      title
+  ).trim()
   const category = meta(product?.category, 'Handicraft')
   const technique = meta(product?.craftTechnique || product?.giTag, 'Heritage craft')
   const origin = meta(product?.regionOrigin || product?.region_origin)

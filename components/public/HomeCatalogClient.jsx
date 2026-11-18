@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import RecentlyAddedGallery from '@/components/public/RecentlyAddedGallery'
 import BestSelling from '@/components/public/BestSelling'
 import FeaturedArtisans from '@/components/public/FeaturedArtisans'
 import { listStoreProducts } from '@/lib/productCatalog'
 import { listLiveStores } from '@/lib/storeRegistry'
+import { syncProductMediaBySku } from '@/app/actions/sync-product-media'
 
 function mapLocalProduct(product) {
   return {
@@ -28,7 +29,7 @@ function mapLocalProduct(product) {
     price: Number(product.price) || 0,
     mrp: Number(product.mrp) || Number(product.price) || 0,
     currencyDefault: product.currency || 'INR',
-    images: Array.isArray(product.images) ? product.images : [],
+    images: Array.isArray(product.images) ? product.images.filter(Boolean) : [],
     video: product.video || null,
     inStock: Boolean(product.inStock),
     isPublished: Boolean(product.isPublished ?? true),
@@ -62,9 +63,13 @@ function mapLocalArtisan(store) {
   }
 }
 
+function skuKey(value) {
+  return String(value || '').trim().toUpperCase()
+}
+
 /**
- * Prefer server (Supabase) catalog; if empty, surface this browser's workshop
- * catalog so newly added pieces/artisans aren't invisible during local demos.
+ * Prefer server (Supabase) catalog; fill missing media from this browser's
+ * workshop catalog (same SKU), and sync those R2 URLs back to Supabase.
  */
 export default function HomeCatalogClient({
   products = [],
@@ -72,6 +77,8 @@ export default function HomeCatalogClient({
 }) {
   const [localProducts, setLocalProducts] = useState([])
   const [localArtisans, setLocalArtisans] = useState([])
+  const [mediaOverrides, setMediaOverrides] = useState({})
+  const syncedRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -84,21 +91,143 @@ export default function HomeCatalogClient({
   }, [])
 
   const displayProducts = useMemo(() => {
-    if (products.length) return products
-    return localProducts
-      .slice()
-      .sort((a, b) => {
-        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
-        return bTime - aTime
-      })
-      .slice(0, 8)
-  }, [products, localProducts])
+    const bySku = new Map()
+    for (const item of localProducts) {
+      const key = skuKey(item.sku)
+      if (key) bySku.set(key, item)
+    }
+
+    const base = products.length
+      ? products
+      : localProducts
+          .slice()
+          .sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return bTime - aTime
+          })
+          .slice(0, 8)
+
+    return base.map((product) => {
+      const key = skuKey(product.sku)
+      const local = key ? bySku.get(key) : null
+      const override = key ? mediaOverrides[key] : null
+      const serverImages = Array.isArray(product.images)
+        ? product.images.filter(Boolean)
+        : []
+      const localImages = Array.isArray(local?.images)
+        ? local.images.filter(Boolean)
+        : []
+      const images =
+        (override?.images?.length ? override.images : null) ||
+        (serverImages.length ? serverImages : null) ||
+        localImages
+
+      return {
+        ...product,
+        images,
+        video: product.video || override?.video || local?.video || null,
+        material: product.material || local?.material || null,
+        dimensions: product.dimensions || local?.dimensions || null,
+        craftTechnique: product.craftTechnique || local?.craftTechnique || null,
+      }
+    })
+  }, [products, localProducts, mediaOverrides])
 
   const displayArtisans = useMemo(() => {
-    if (artisans.length) return artisans
-    return localArtisans.slice(0, 6)
-  }, [artisans, localArtisans])
+    const base = artisans.length ? artisans : localArtisans.slice(0, 6)
+    return base.map((artisan) => {
+      const local = localArtisans.find(
+        (item) =>
+          String(item.username || '').toLowerCase() ===
+          String(artisan.username || '').toLowerCase()
+      )
+      const logo =
+        artisan.logoUrl ||
+        artisan.logo ||
+        local?.logoUrl ||
+        local?.logo ||
+        displayProducts.find(
+          (product) =>
+            String(product.artisanUsername || product.storeUsername || '')
+              .toLowerCase() === String(artisan.username || '').toLowerCase() &&
+            product.images?.[0]
+        )?.images?.[0] ||
+        null
+
+      return {
+        ...artisan,
+        logoUrl: logo,
+        logo,
+      }
+    })
+  }, [artisans, localArtisans, displayProducts])
+
+  useEffect(() => {
+    if (syncedRef.current) return
+    if (!localProducts.length && !localArtisans.length) return
+
+    const payload = []
+
+    for (const local of localProducts) {
+      if (!local.sku || !local.images?.length) continue
+      const server = products.find(
+        (item) => skuKey(item.sku) === skuKey(local.sku)
+      )
+      const serverImages = Array.isArray(server?.images)
+        ? server.images.filter(Boolean)
+        : []
+      if (!server || serverImages.length === 0) {
+        payload.push({
+          sku: local.sku,
+          images: local.images,
+          video: local.video || null,
+        })
+      }
+    }
+
+    for (const local of localArtisans) {
+      if (local.username && (local.logoUrl || local.logo)) {
+        payload.push({
+          username: local.username,
+          logoUrl: local.logoUrl || local.logo,
+        })
+      }
+    }
+
+    // Also push first product photo as workshop logo when store has none.
+    for (const artisan of artisans) {
+      if (artisan.logoUrl || artisan.logo) continue
+      const photo = displayProducts.find(
+        (product) =>
+          String(product.artisanUsername || product.storeUsername || '')
+            .toLowerCase() === String(artisan.username || '').toLowerCase() &&
+          product.images?.[0]
+      )?.images?.[0]
+      if (photo && artisan.username) {
+        payload.push({ username: artisan.username, logoUrl: photo })
+      }
+    }
+
+    if (!payload.length) return
+    syncedRef.current = true
+
+    void syncProductMediaBySku(payload).then((result) => {
+      if (!result.ok || !result.updated) return
+      const next = {}
+      for (const row of payload) {
+        if (row.sku && row.images?.length) {
+          next[skuKey(row.sku)] = {
+            images: row.images,
+            video: row.video || null,
+          }
+        }
+      }
+      if (Object.keys(next).length) {
+        setMediaOverrides((prev) => ({ ...prev, ...next }))
+      }
+    })
+  }, [localProducts, localArtisans, products, artisans, displayProducts])
 
   return (
     <>

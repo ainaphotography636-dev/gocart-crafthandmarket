@@ -1,4 +1,5 @@
 import CatalogHydrator from "@/components/marketplace/CatalogHydrator"
+import CatalogMediaBridge from "@/components/marketplace/CatalogMediaBridge"
 import ShopCatalog from "@/components/marketplace/ShopCatalog"
 import {
   listStorefrontArtisans,
@@ -24,6 +25,7 @@ export default async function ShopPage({
   return (
     <>
       <CatalogHydrator products={productsResult.items} />
+      <CatalogMediaBridge products={productsResult.items} />
       <ShopCatalog
         products={productsResult.items}
         artisans={artisansResult.items}

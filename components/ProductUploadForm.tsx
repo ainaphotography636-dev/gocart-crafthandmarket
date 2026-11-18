@@ -10,13 +10,13 @@ import {
   type ChangeEvent,
 } from "react"
 import {
-  CheckCircle2Icon,
   ClapperboardIcon,
   ImagePlusIcon,
+  InfoIcon,
   Loader2Icon,
-  PlusIcon,
+  PackageIcon,
+  RulerIcon,
   Trash2Icon,
-  UploadCloudIcon,
   XIcon,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
@@ -30,7 +30,6 @@ import {
   FORM_MAX_VIDEO_BYTES,
   type CompressAndUploadProgress,
 } from "@/lib/compressAndUploadVideo"
-import { CRAFT_MATERIALS, GI_TAG_OPTIONS } from "@/lib/handicraftCategories"
 import { claimNextProductSku, getActiveStore } from "@/lib/storeRegistry"
 import { formatProductTitle } from "@/lib/productCodes"
 
@@ -40,6 +39,7 @@ type UploadedImage = {
   key?: string | null
   name: string
   previewUrl: string
+  slotId: string
 }
 
 type UploadedVideo = {
@@ -56,14 +56,12 @@ type ProductFields = {
   description: string
   mrp: string
   price: string
+  stock: string
   category: string
   material: string
   craftTechnique: string
   dimensions: string
-  weight: string
   regionOrigin: string
-  careInstructions: string
-  giTag: string
 }
 
 type RouteIds = {
@@ -75,21 +73,19 @@ type RouteIds = {
 
 const MIN_PHOTOS = 4
 const MAX_PHOTOS = 6
-const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
-const VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.webm,.mov,.m4v"
+const IMAGE_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+const VIDEO_ACCEPT =
+  "video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.webm,.mov,.m4v"
 
-const CRAFT_TECHNIQUES = [
-  "Handloom weaving",
-  "Lost-wax casting",
-  "Hand carving",
-  "Wheel-thrown pottery",
-  "Block printing",
-  "Embroidery",
-  "Inlay / marquetry",
-  "Beadwork",
-  "Natural dyeing",
-  "Other",
-]
+const PHOTO_SLOTS = [
+  { id: "main", label: "1. Main Shot", optional: false },
+  { id: "angle", label: "2. Angle View", optional: false },
+  { id: "detail", label: "3. Detail / Texture", optional: false },
+  { id: "scale", label: "4. In-Use / Scale", optional: false },
+  { id: "packaging", label: "5. Packaging (Opt.)", optional: true },
+  { id: "back", label: "6. Back View (Opt.)", optional: true },
+] as const
 
 function isVideoFile(file: File) {
   if (file.type.startsWith("video/")) return true
@@ -111,15 +107,17 @@ function emptyFields(): ProductFields {
     description: "",
     mrp: "",
     price: "",
+    stock: "10",
     category: "",
     material: "",
     craftTechnique: "",
     dimensions: "",
-    weight: "",
     regionOrigin: "",
-    careInstructions: "",
-    giTag: "",
   }
+}
+
+function emptySlots(): Array<UploadedImage | null> {
+  return PHOTO_SLOTS.map(() => null)
 }
 
 async function uploadImages(
@@ -149,6 +147,12 @@ async function uploadImages(
   }
 }
 
+const inputClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand-emerald focus:ring-2 focus:ring-brand-emerald/15"
+const labelClass = "mb-1.5 block text-sm font-medium text-slate-700"
+const cardClass =
+  "rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6"
+
 export type ProductUploadFormProps = {
   productId?: string
   artisanId?: string
@@ -165,21 +169,21 @@ export default function ProductUploadForm({
   artisanId: artisanIdProp,
   onComplete,
 }: ProductUploadFormProps = {}) {
-  const photoInputId = useId()
   const videoInputId = useId()
-  const photoInputRef = useRef<HTMLInputElement>(null)
+  const slotInputRefs = useRef<Array<HTMLInputElement | null>>([])
   const videoInputRef = useRef<HTMLInputElement>(null)
   const claimedRef = useRef<RouteIds | null>(null)
-  const imagesRef = useRef<UploadedImage[]>([])
+  const slotsRef = useRef<Array<UploadedImage | null>>(emptySlots())
   const videoRef = useRef<UploadedVideo | null>(null)
 
   const [artisanId, setArtisanId] = useState(artisanIdProp || "")
   const [productId, setProductId] = useState(productIdProp || "")
-  const [storeName, setStoreName] = useState("")
-  const [dragActive, setDragActive] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState<CompressAndUploadProgress | null>(null)
-  const [images, setImages] = useState<UploadedImage[]>([])
+  const [busySlot, setBusySlot] = useState<string | null>(null)
+  const [busyVideo, setBusyVideo] = useState(false)
+  const [progress, setProgress] = useState<CompressAndUploadProgress | null>(
+    null
+  )
+  const [slots, setSlots] = useState<Array<UploadedImage | null>>(emptySlots())
   const [video, setVideo] = useState<UploadedVideo | null>(null)
   const [error, setError] = useState("")
   const [productInfo, setProductInfo] = useState<ProductFields>(emptyFields())
@@ -187,8 +191,8 @@ export default function ProductUploadForm({
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null)
 
   useEffect(() => {
-    imagesRef.current = images
-  }, [images])
+    slotsRef.current = slots
+  }, [slots])
 
   useEffect(() => {
     videoRef.current = video
@@ -205,11 +209,13 @@ export default function ProductUploadForm({
   useEffect(() => {
     const store = getActiveStore()
     if (!store) return
-    setStoreName(store.name || "")
     if (!artisanIdProp && store.artisanCode) {
       setArtisanId(store.artisanCode)
     }
   }, [artisanIdProp])
+
+  const filledImages = slots.filter(Boolean) as UploadedImage[]
+  const filledCount = filledImages.length
 
   const ensureRouteIds = useCallback((): RouteIds => {
     if (claimedRef.current) return claimedRef.current
@@ -232,7 +238,9 @@ export default function ProductUploadForm({
       throw new Error("Connect an active workshop before uploading media.")
     }
     if (store.status !== "approved" || !store.isActive) {
-      throw new Error("Approve and activate your workshop before uploading media.")
+      throw new Error(
+        "Approve and activate your workshop before uploading media."
+      )
     }
 
     const claimed = claimNextProductSku(store.id)
@@ -245,60 +253,58 @@ export default function ProductUploadForm({
     claimedRef.current = route
     setArtisanId(route.artisanId)
     setProductId(route.productId)
-    setStoreName(store.name || "")
     return route
   }, [artisanIdProp, productIdProp])
 
-  const handlePhotoFiles = useCallback(
-    async (fileList: FileList | File[]) => {
+  const handleSlotFile = useCallback(
+    async (slotIndex: number, fileList: FileList | File[] | null) => {
       const files = Array.from(fileList || []).filter(Boolean)
       if (!files.length) return
 
+      const slot = PHOTO_SLOTS[slotIndex]
+      const file = files[0]
       setError("")
-      setBusy(true)
+      setBusySlot(slot.id)
       setProgress(null)
 
       try {
         const route = ensureRouteIds()
-        const existingImages = imagesRef.current
-        const imageBatch: File[] = []
-
-        for (const file of files) {
-          if (!isImageFile(file)) {
-            throw new Error(`Unsupported image type: ${file.name}`)
-          }
-          if (file.size > 5 * 1024 * 1024) {
-            throw new Error(`Image "${file.name}" must be 5MB or smaller.`)
-          }
-          imageBatch.push(file)
+        if (!isImageFile(file)) {
+          throw new Error(`Unsupported image type: ${file.name}`)
         }
-
-        if (existingImages.length + imageBatch.length > MAX_PHOTOS) {
-          throw new Error(`Upload ${MIN_PHOTOS}–${MAX_PHOTOS} product photos.`)
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`Image "${file.name}" must be 5MB or smaller.`)
         }
 
         setProgress({
-          percent: 25,
+          percent: 30,
           stage: "uploading",
-          message: `Uploading ${imageBatch.length} photo${imageBatch.length > 1 ? "s" : ""}…`,
+          message: `Uploading ${slot.label}…`,
         })
-        const uploaded = await uploadImages(imageBatch, route)
-        const added: UploadedImage[] = imageBatch.map((file, index) => ({
-          id: `${Date.now()}-${index}-${file.name}`,
-          url: uploaded.urls[index],
-          key: uploaded.keys[index] || null,
+        const uploaded = await uploadImages([file], route)
+        const nextImage: UploadedImage = {
+          id: `${slot.id}-${Date.now()}`,
+          url: uploaded.urls[0],
+          key: uploaded.keys[0] || null,
           name: file.name,
           previewUrl: URL.createObjectURL(file),
-        }))
-        const nextImages = [...existingImages, ...added]
-        setImages(nextImages)
+          slotId: slot.id,
+        }
+
+        const nextSlots = [...slotsRef.current]
+        const previous = nextSlots[slotIndex]
+        if (previous?.previewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(previous.previewUrl)
+        }
+        nextSlots[slotIndex] = nextImage
+        setSlots(nextSlots)
         setProgress({
           percent: 100,
           stage: "done",
-          message: "Photos uploaded to Cloudflare R2.",
+          message: "Photo uploaded to Cloudflare R2.",
         })
         onComplete?.({
-          images: nextImages,
+          images: nextSlots.filter(Boolean) as UploadedImage[],
           video: videoRef.current,
           artisanId: route.artisanId,
           productId: route.productId,
@@ -306,27 +312,24 @@ export default function ProductUploadForm({
       } catch (err) {
         const message = err instanceof Error ? err.message : "Upload failed."
         setError(message)
-        setProgress({
-          percent: 0,
-          stage: "error",
-          message,
-        })
+        setProgress({ percent: 0, stage: "error", message })
         toast.error(message)
       } finally {
-        setBusy(false)
-        if (photoInputRef.current) photoInputRef.current.value = ""
+        setBusySlot(null)
+        const input = slotInputRefs.current[slotIndex]
+        if (input) input.value = ""
       }
     },
     [ensureRouteIds, onComplete]
   )
 
   const handleVideoFile = useCallback(
-    async (fileList: FileList | File[]) => {
+    async (fileList: FileList | File[] | null) => {
       const files = Array.from(fileList || []).filter(Boolean)
       if (!files.length) return
 
       setError("")
-      setBusy(true)
+      setBusyVideo(true)
       setProgress(null)
 
       try {
@@ -360,35 +363,34 @@ export default function ProductUploadForm({
         }
         setVideo(nextVideo)
         onComplete?.({
-          images: imagesRef.current,
+          images: slotsRef.current.filter(Boolean) as UploadedImage[],
           video: nextVideo,
           artisanId: route.artisanId,
           productId: route.productId,
         })
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Video upload failed."
+        const message =
+          err instanceof Error ? err.message : "Video upload failed."
         setError(message)
-        setProgress({
-          percent: 0,
-          stage: "error",
-          message,
-        })
+        setProgress({ percent: 0, stage: "error", message })
         toast.error(message)
       } finally {
-        setBusy(false)
+        setBusyVideo(false)
         if (videoInputRef.current) videoInputRef.current.value = ""
       }
     },
     [ensureRouteIds, onComplete]
   )
 
-  const removeImage = (id: string) => {
-    setImages((prev) => {
-      const target = prev.find((item) => item.id === id)
+  const clearSlot = (slotIndex: number) => {
+    setSlots((prev) => {
+      const next = [...prev]
+      const target = next[slotIndex]
       if (target?.previewUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(target.previewUrl)
       }
-      return prev.filter((item) => item.id !== id)
+      next[slotIndex] = null
+      return next
     })
   }
 
@@ -400,7 +402,9 @@ export default function ProductUploadForm({
   }
 
   const onChangeHandler = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    event: ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = event.target
     setProductInfo((prev) => ({ ...prev, [name]: value }))
@@ -410,7 +414,11 @@ export default function ProductUploadForm({
     setCustomSpecs((prev) => [...prev, { key: "", value: "" }])
   }
 
-  const updateCustomSpec = (index: number, field: keyof CustomSpec, value: string) => {
+  const updateCustomSpec = (
+    index: number,
+    field: keyof CustomSpec,
+    value: string
+  ) => {
     setCustomSpecs((prev) =>
       prev.map((row, rowIndex) =>
         rowIndex === index ? { ...row, [field]: value } : row
@@ -423,13 +431,17 @@ export default function ProductUploadForm({
   }
 
   const resetForm = (storeArtisanCode: string) => {
-    images.forEach((item) => {
-      if (item.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(item.previewUrl)
+    slots.forEach((item) => {
+      if (item?.previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(item.previewUrl)
+      }
     })
-    if (video?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(video.previewUrl)
+    if (video?.previewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(video.previewUrl)
+    }
     setProductInfo(emptyFields())
     setCustomSpecs([])
-    setImages([])
+    setSlots(emptySlots())
     setVideo(null)
     setProgress(null)
     setError("")
@@ -439,11 +451,11 @@ export default function ProductUploadForm({
   }
 
   const saveProduct = async (publish: boolean) => {
-    if (publish && (images.length < MIN_PHOTOS || images.length > MAX_PHOTOS)) {
+    if (publish && (filledCount < MIN_PHOTOS || filledCount > MAX_PHOTOS)) {
       toast.error(`Publish requires ${MIN_PHOTOS}–${MAX_PHOTOS} product photos.`)
       return
     }
-    if (!images.length) {
+    if (!filledCount) {
       toast.error("Add at least one product photo.")
       return
     }
@@ -452,7 +464,9 @@ export default function ProductUploadForm({
     try {
       const store = getActiveStore()
       if (!store || store.status !== "approved") {
-        throw new Error("Approve and activate your workshop before adding products.")
+        throw new Error(
+          "Approve and activate your workshop before adding products."
+        )
       }
 
       let sku = productId
@@ -485,10 +499,11 @@ export default function ProductUploadForm({
       const category = String(productInfo.category || "").trim()
       const mrp = Number(productInfo.mrp)
       const price = Number(productInfo.price)
+      const stock = Number(productInfo.stock)
 
-      if (!name) throw new Error("Product name is required.")
-      if (!description) throw new Error("Product description is required.")
-      if (!category) throw new Error("Select a category.")
+      if (!name) throw new Error("Product title is required.")
+      if (!description) throw new Error("Story & description is required.")
+      if (!category) throw new Error("Select a craft category.")
       if (!Number.isFinite(mrp) || mrp <= 0) {
         throw new Error("Enter a valid actual price (₹).")
       }
@@ -498,8 +513,11 @@ export default function ProductUploadForm({
       if (price > mrp) {
         throw new Error("Offer price cannot be higher than actual price.")
       }
+      if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
+        throw new Error("Enter a valid stock quantity.")
+      }
 
-      const imageUrls = images.map((item) => item.url)
+      const imageUrls = filledImages.map((item) => item.url)
       const videoUrl = video?.url || null
 
       const persisted = await createMarketplaceProduct({
@@ -508,6 +526,7 @@ export default function ProductUploadForm({
         category,
         priceInr: price,
         mrpInr: mrp,
+        stockQuantity: stock,
         images: imageUrls,
         videoProofUrl: videoUrl,
         sku,
@@ -519,10 +538,7 @@ export default function ProductUploadForm({
           material: productInfo.material,
           craftTechnique: productInfo.craftTechnique,
           dimensions: productInfo.dimensions,
-          weight: productInfo.weight,
           regionOrigin: productInfo.regionOrigin,
-          careInstructions: productInfo.careInstructions,
-          giTag: productInfo.giTag,
           custom: customSpecs,
         },
       })
@@ -539,11 +555,12 @@ export default function ProductUploadForm({
         description,
         mrp,
         price,
+        stock,
         category,
         images: imageUrls,
         video: videoUrl,
         mediaStorage: "r2" as const,
-        inStock: true,
+        inStock: stock > 0,
         rating: [],
         createdAt: now,
         updatedAt: now,
@@ -589,279 +606,273 @@ export default function ProductUploadForm({
     }
   }
 
-  const pathPreview = `artisans/${artisanId || "{artisanId}"}/products/${
-    productId || "{sku}"
-  }/`
-  const photoCountLabel = `${images.length}/${MAX_PHOTOS} photos`
+  const pathPreview = `artisans/${artisanId || "ART001"}/products/`
+  const busy = Boolean(busySlot) || busyVideo
 
   return (
     <div className="relative pb-28 text-slate-600">
-      <div className="mx-auto max-w-4xl">
-        <p className="text-xs uppercase tracking-[0.18em] text-brand-gold">
-          Artisan catalog
-        </p>
-        <h1 className="mt-2 font-display text-3xl tracking-tight text-brand-ink">
-          Add a <span className="text-brand-emerald">handcrafted piece</span>
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">
-          Upload 4–6 product photos{storeName ? ` for ${storeName}` : ""}. Optional
-          product video compresses to ~720p in your browser before R2 upload. Prices
-          are in Indian Rupees (₹).
-        </p>
-
-        <div className="mt-6 rounded-xl border border-brand-emerald/20 bg-gradient-to-br from-brand-emerald-soft/70 via-white to-brand-amber-soft/40 px-4 py-3">
-          <p className="text-xs uppercase tracking-[0.14em] text-brand-gold">
-            R2 folder
+      <div className="mx-auto max-w-4xl space-y-5">
+        {/* Page header */}
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            Add New Handicraft Piece
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+            Upload high-resolution photos and optional item video. Files are
+            stored securely in Cloudflare R2 under{" "}
+            <span className="font-mono text-[13px] text-brand-emerald">
+              {pathPreview}
+            </span>
           </p>
-          <p className="mt-1 break-all font-mono text-sm text-brand-emerald">
-            {pathPreview}
-          </p>
-        </div>
+        </header>
 
-        {/* Photos */}
-        <section className="mt-8 rounded-2xl border border-brand-gold/20 bg-white/90 p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+        {/* Master workshop video */}
+        <aside className="flex flex-col gap-3 rounded-xl border border-brand-emerald/25 bg-brand-emerald-soft/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+          <div className="flex gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-brand-emerald shadow-sm">
+              <ClapperboardIcon size={18} />
+            </span>
             <div>
-              <h2 className="text-lg font-medium text-slate-800">Product photos</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Required: {MIN_PHOTOS}–{MAX_PHOTOS} images (JPEG/PNG/WebP, max 5MB each).
+              <p className="text-sm font-semibold text-slate-800">
+                Master Workshop Video{" "}
+                <span className="font-normal text-slate-500">
+                  (Shared across your catalog)
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-slate-600 sm:text-sm">
+                Your profile workshop video is already linked to all your
+                product listings automatically. Manage it in profile settings —
+                it is not uploaded here.
               </p>
             </div>
-            <span className="rounded-full bg-brand-amber-soft px-3 py-1 text-xs text-brand-gold">
-              {photoCountLabel}
-            </span>
           </div>
-
-          <div
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault()
-                photoInputRef.current?.click()
-              }
-            }}
-            onDragEnter={(event) => {
-              event.preventDefault()
-              setDragActive(true)
-            }}
-            onDragOver={(event) => {
-              event.preventDefault()
-              setDragActive(true)
-            }}
-            onDragLeave={(event) => {
-              event.preventDefault()
-              setDragActive(false)
-            }}
-            onDrop={(event) => {
-              event.preventDefault()
-              setDragActive(false)
-              if (!busy) void handlePhotoFiles(event.dataTransfer.files)
-            }}
-            onClick={() => !busy && photoInputRef.current?.click()}
-            className={`mt-4 cursor-pointer rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
-              dragActive
-                ? "scale-[1.01] border-brand-emerald bg-brand-emerald-soft/80"
-                : "border-brand-emerald/30 bg-gradient-to-b from-white to-brand-emerald-soft/20 hover:border-brand-emerald/60"
-            } ${busy ? "pointer-events-none opacity-70" : ""}`}
+          <Link
+            href="/store"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-emerald/30 bg-white px-3.5 py-2 text-sm font-medium text-brand-emerald transition hover:bg-brand-emerald-soft"
           >
-            <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-emerald text-white">
-              {busy ? (
-                <Loader2Icon className="animate-spin" size={22} />
-              ) : (
-                <UploadCloudIcon size={22} />
-              )}
-            </span>
-            <p className="mt-3 font-medium text-brand-ink">
-              Drop product photos or click to browse
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              <ImagePlusIcon className="mr-1 inline" size={12} />
-              Stored under artisans/…/products/&#123;sku&#125;/
-            </p>
-            <input
-              ref={photoInputRef}
-              id={photoInputId}
-              type="file"
-              accept={IMAGE_ACCEPT}
-              multiple
-              hidden
-              disabled={busy || images.length >= MAX_PHOTOS}
-              onChange={(event) => {
-                if (event.target.files?.length) void handlePhotoFiles(event.target.files)
-              }}
-            />
+            Manage Workshop Video
+          </Link>
+        </aside>
+
+        {/* Product media */}
+        <section className={cardClass}>
+          <div className="flex items-start gap-2">
+            <ImagePlusIcon size={18} className="mt-0.5 text-brand-emerald" />
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Product Photos{" "}
+                <span className="font-normal text-slate-500">
+                  (Upload 4 to 6 Photos)
+                </span>
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                JPEG / PNG / WebP · max 5MB each · {filledCount}/{MAX_PHOTOS}{" "}
+                uploaded
+              </p>
+            </div>
           </div>
 
-          {images.length ? (
-            <ul className="mt-4 flex flex-wrap gap-3">
-              {images.map((item) => (
-                <li key={item.id} className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.previewUrl || item.url}
-                    alt={item.name}
-                    className="h-24 w-24 rounded-md border border-brand-emerald/20 object-cover"
-                  />
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            {PHOTO_SLOTS.map((slot, index) => {
+              const image = slots[index]
+              const uploading = busySlot === slot.id
+              return (
+                <div key={slot.id} className="relative">
                   <button
                     type="button"
-                    onClick={() => removeImage(item.id)}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-brand-ink text-white hover:bg-brand-amber"
-                    aria-label={`Remove ${item.name}`}
+                    disabled={busy}
+                    onClick={() => slotInputRefs.current[index]?.click()}
+                    className={`group relative flex aspect-[4/3] w-full flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed px-2 text-center transition ${
+                      image
+                        ? "border-brand-emerald/40 bg-slate-50"
+                        : "border-slate-200 bg-slate-50/60 hover:border-brand-emerald/50 hover:bg-brand-emerald-soft/40"
+                    } ${busy ? "cursor-wait opacity-70" : "cursor-pointer"}`}
                   >
-                    <XIcon size={12} />
+                    {image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={image.previewUrl || image.url}
+                        alt={slot.label}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <>
+                        <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm group-hover:text-brand-emerald">
+                          {uploading ? (
+                            <Loader2Icon size={16} className="animate-spin" />
+                          ) : (
+                            <ImagePlusIcon size={16} />
+                          )}
+                        </span>
+                        <span className="text-xs font-medium text-slate-600">
+                          {slot.label}
+                        </span>
+                      </>
+                    )}
+                    {image ? (
+                      <span className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1 text-[11px] font-medium text-white">
+                        {slot.label}
+                      </span>
+                    ) : null}
                   </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
+                  {image ? (
+                    <button
+                      type="button"
+                      onClick={() => clearSlot(index)}
+                      className="absolute -right-1.5 -top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-white shadow hover:bg-red-600"
+                      aria-label={`Remove ${slot.label}`}
+                    >
+                      <XIcon size={12} />
+                    </button>
+                  ) : null}
+                  <input
+                    ref={(el) => {
+                      slotInputRefs.current[index] = el
+                    }}
+                    type="file"
+                    accept={IMAGE_ACCEPT}
+                    hidden
+                    disabled={busy}
+                    onChange={(event) => {
+                      void handleSlotFile(index, event.target.files)
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </div>
 
-        {/* Product video */}
-        <section className="mt-6 rounded-2xl border border-brand-gold/20 bg-white/90 p-5 shadow-sm">
-          <h2 className="text-lg font-medium text-slate-800">
-            Product video <span className="text-sm font-normal text-slate-400">(optional)</span>
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Short clip for this specific item only. Compresses to ~720p before upload.
-          </p>
-
-          {!video ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => videoInputRef.current?.click()}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-gold/35 bg-brand-amber-soft/40 px-4 py-8 text-sm text-brand-ink transition hover:border-brand-gold disabled:opacity-60"
-            >
-              <ClapperboardIcon size={18} className="text-brand-gold" />
-              Add product-level video
-            </button>
-          ) : (
-            <div className="mt-4 max-w-md">
-              <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <CheckCircle2Icon size={16} className="text-brand-emerald" />
-                  Product video ready
+          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-brand-emerald shadow-sm">
+                <ClapperboardIcon size={16} />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  Product Close-up Video{" "}
+                  <span className="font-normal text-slate-500">(Optional)</span>
                 </p>
+                <p className="text-xs text-slate-500">
+                  Short clip for this specific item. Compresses to ~720p before
+                  R2 upload.
+                </p>
+                {video ? (
+                  <p className="mt-1 text-xs text-brand-emerald">
+                    {video.name} · {formatMb(video.originalBytes)}
+                    {video.compressedBytes !== video.originalBytes
+                      ? ` → ${formatMb(video.compressedBytes)}`
+                      : ""}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {video ? (
                 <button
                   type="button"
                   onClick={clearVideo}
-                  className="text-xs text-brand-amber hover:underline"
+                  className="rounded-lg px-3 py-2 text-xs text-slate-500 hover:text-red-600"
                 >
                   Remove
                 </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {video.name} · {formatMb(video.originalBytes)}
-                {video.compressedBytes !== video.originalBytes
-                  ? ` → ${formatMb(video.compressedBytes)}`
-                  : ""}
-              </p>
-              <video
-                src={video.previewUrl || video.url}
-                controls
-                className="mt-3 aspect-video w-full rounded-lg bg-brand-ink/90"
-              />
-            </div>
-          )}
-          <input
-            ref={videoInputRef}
-            id={videoInputId}
-            type="file"
-            accept={VIDEO_ACCEPT}
-            hidden
-            disabled={busy || Boolean(video)}
-            onChange={(event) => {
-              if (event.target.files?.length) void handleVideoFile(event.target.files)
-            }}
-          />
-        </section>
-
-        {/* Workshop video note */}
-        <aside className="mt-6 rounded-2xl border border-dashed border-brand-emerald/30 bg-brand-emerald-soft/40 px-5 py-4 text-sm text-slate-600">
-          <p className="font-medium text-brand-ink">Profile workshop video</p>
-          <p className="mt-1">
-            Your main workshop / atelier video is managed in{" "}
-            <Link href="/store" className="text-brand-emerald hover:underline">
-              profile settings
-            </Link>{" "}
-            and is shared across all of your catalog items. It is not uploaded here.
-          </p>
-        </aside>
-
-        {progress ? (
-          <div
-            className={`mt-6 overflow-hidden rounded-xl border px-4 py-3 ${
-              progress.stage === "error"
-                ? "border-red-200 bg-red-50"
-                : progress.stage === "done"
-                  ? "border-brand-emerald/30 bg-brand-emerald-soft/60"
-                  : "border-brand-gold/25 bg-brand-amber-soft/50"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <p className="flex items-center gap-2 font-medium text-brand-ink">
-                {progress.stage === "done" ? (
-                  <CheckCircle2Icon size={16} className="text-brand-emerald" />
-                ) : progress.stage === "error" ? null : (
-                  <Loader2Icon size={16} className="animate-spin text-brand-gold" />
-                )}
-                {progress.message}
-              </p>
-              <span className="font-mono text-xs tabular-nums text-slate-500">
-                {Math.round(progress.percent)}%
-              </span>
-            </div>
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
-              <div
-                className={`h-full rounded-full transition-[width] duration-300 ${
-                  progress.stage === "error"
-                    ? "bg-red-400"
-                    : "bg-gradient-to-r from-brand-emerald to-brand-gold"
-                }`}
-                style={{ width: `${Math.min(100, Math.max(0, progress.percent))}%` }}
+              ) : null}
+              <button
+                type="button"
+                disabled={busy || Boolean(video)}
+                onClick={() => videoInputRef.current?.click()}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-emerald/40 hover:text-brand-emerald disabled:opacity-60"
+              >
+                {busyVideo ? "Uploading…" : "Choose Item Video"}
+              </button>
+              <input
+                ref={videoInputRef}
+                id={videoInputId}
+                type="file"
+                accept={VIDEO_ACCEPT}
+                hidden
+                disabled={busy || Boolean(video)}
+                onChange={(event) => {
+                  void handleVideoFile(event.target.files)
+                }}
               />
             </div>
           </div>
-        ) : null}
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+          {video ? (
+            <video
+              src={video.previewUrl || video.url}
+              controls
+              className="mt-4 aspect-video w-full max-w-md rounded-lg bg-slate-900"
+            />
+          ) : null}
 
-        {/* Basics + INR pricing */}
-        <section className="mt-6 rounded-2xl border border-brand-gold/20 bg-white/90 p-5 shadow-sm">
-          <h2 className="text-lg font-medium text-slate-800">Details & pricing (₹)</h2>
-          <div className="mt-4 grid gap-4">
-            <label className="flex flex-col gap-1.5 text-sm">
-              Name
+          {progress ? (
+            <div
+              className={`mt-4 overflow-hidden rounded-lg border px-3 py-2.5 text-sm ${
+                progress.stage === "error"
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : progress.stage === "done"
+                    ? "border-brand-emerald/30 bg-brand-emerald-soft text-brand-emerald"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-2">
+                  {progress.stage !== "done" && progress.stage !== "error" ? (
+                    <Loader2Icon size={14} className="animate-spin" />
+                  ) : null}
+                  {progress.message}
+                </p>
+                <span className="font-mono text-xs tabular-nums">
+                  {Math.round(progress.percent)}%
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/80">
+                <div
+                  className={`h-full rounded-full transition-[width] ${
+                    progress.stage === "error"
+                      ? "bg-red-400"
+                      : "bg-brand-emerald"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, progress.percent))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        </section>
+
+        {/* Basic information */}
+        <section className={cardClass}>
+          <div className="flex items-center gap-2">
+            <InfoIcon size={18} className="text-brand-emerald" />
+            <h2 className="text-base font-semibold text-slate-900">
+              Basic Information
+            </h2>
+          </div>
+          <div className="mt-5 space-y-4">
+            <label className="block">
+              <span className={labelClass}>Product Title</span>
               <input
                 type="text"
                 name="name"
                 value={productInfo.name}
                 onChange={onChangeHandler}
-                placeholder="e.g. Hand-thrown terracotta pot"
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
+                placeholder="e.g., Hand-carved Rosewood Spice Box with Brass Inlay"
+                className={inputClass}
                 required
               />
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              Description
-              <textarea
-                name="description"
-                value={productInfo.description}
-                onChange={onChangeHandler}
-                rows={4}
-                placeholder="Tell the story of this piece, materials, and craft method"
-                className="resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-                required
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              Craft category
+            <label className="block">
+              <span className={labelClass}>Craft Category</span>
               <select
                 name="category"
                 value={productInfo.category}
                 onChange={onChangeHandler}
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
+                className={inputClass}
                 required
               >
                 <option value="">Select a craft category</option>
@@ -872,229 +883,200 @@ export default function ProductUploadForm({
                 ))}
               </select>
             </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-1.5 text-sm">
-                Actual Price (₹)
-                <input
-                  type="number"
-                  name="mrp"
-                  min="0"
-                  step="1"
-                  value={productInfo.mrp}
-                  onChange={onChangeHandler}
-                  placeholder="0"
-                  className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-                  required
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm">
-                Offer Price (₹)
-                <input
-                  type="number"
-                  name="price"
-                  min="0"
-                  step="1"
-                  value={productInfo.price}
-                  onChange={onChangeHandler}
-                  placeholder="0"
-                  className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-                  required
-                />
-              </label>
-            </div>
+            <label className="block">
+              <span className={labelClass}>Story & Description</span>
+              <textarea
+                name="description"
+                value={productInfo.description}
+                onChange={onChangeHandler}
+                rows={5}
+                placeholder="Share the heritage, materials, and craftsmanship behind this piece..."
+                className={`${inputClass} resize-none`}
+                required
+              />
+            </label>
           </div>
         </section>
 
-        {/* Handicraft specs */}
-        <section className="mt-6 rounded-2xl border border-brand-gold/20 bg-white/90 p-5 shadow-sm">
-          <h2 className="text-lg font-medium text-slate-800">
-            Handicraft specifications
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Standard fields for Indian craft listings. Add custom rows for unique traits.
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-sm">
-              Material
-              <select
+        {/* Pricing & inventory */}
+        <section className={cardClass}>
+          <div className="flex items-center gap-2">
+            <PackageIcon size={18} className="text-brand-emerald" />
+            <h2 className="text-base font-semibold text-slate-900">
+              Pricing & Inventory{" "}
+              <span className="font-normal text-slate-500">(INR)</span>
+            </h2>
+          </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <label className="block">
+              <span className={labelClass}>Actual Price (₹)</span>
+              <input
+                type="number"
+                name="mrp"
+                min="0"
+                step="1"
+                value={productInfo.mrp}
+                onChange={onChangeHandler}
+                placeholder="₹ 4,500"
+                className={inputClass}
+                required
+              />
+            </label>
+            <label className="block">
+              <span className={labelClass}>Offer Price (₹)</span>
+              <input
+                type="number"
+                name="price"
+                min="0"
+                step="1"
+                value={productInfo.price}
+                onChange={onChangeHandler}
+                placeholder="₹ 3,499"
+                className={inputClass}
+                required
+              />
+            </label>
+            <label className="block">
+              <span className={labelClass}>Stock Quantity</span>
+              <input
+                type="number"
+                name="stock"
+                min="0"
+                step="1"
+                value={productInfo.stock}
+                onChange={onChangeHandler}
+                placeholder="10"
+                className={inputClass}
+                required
+              />
+            </label>
+          </div>
+        </section>
+
+        {/* Handicraft specifications */}
+        <section className={cardClass}>
+          <div className="flex items-center gap-2">
+            <RulerIcon size={18} className="text-brand-emerald" />
+            <h2 className="text-base font-semibold text-slate-900">
+              Handicraft Specifications
+            </h2>
+          </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className={labelClass}>Primary Material</span>
+              <input
+                type="text"
                 name="material"
                 value={productInfo.material}
                 onChange={onChangeHandler}
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-              >
-                <option value="">Select material</option>
-                {CRAFT_MATERIALS.map((material) => (
-                  <option key={material} value={material}>
-                    {material}
-                  </option>
-                ))}
-              </select>
+                placeholder="e.g., Sheesham Wood & Brass"
+                className={inputClass}
+              />
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              Craft Technique
-              <select
+            <label className="block">
+              <span className={labelClass}>Craft Technique</span>
+              <input
+                type="text"
                 name="craftTechnique"
                 value={productInfo.craftTechnique}
                 onChange={onChangeHandler}
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-              >
-                <option value="">Select technique</option>
-                {CRAFT_TECHNIQUES.map((technique) => (
-                  <option key={technique} value={technique}>
-                    {technique}
-                  </option>
-                ))}
-              </select>
+                placeholder="e.g., Tarkashi Brass Wire Inlay"
+                className={inputClass}
+              />
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              Dimensions / Size
+            <label className="block">
+              <span className={labelClass}>Dimensions (L x W x H)</span>
               <input
                 type="text"
                 name="dimensions"
                 value={productInfo.dimensions}
                 onChange={onChangeHandler}
-                placeholder="e.g. 12 cm × 8 cm"
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
+                placeholder="e.g., 20cm x 15cm x 8cm"
+                className={inputClass}
               />
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              Weight
-              <input
-                type="text"
-                name="weight"
-                value={productInfo.weight}
-                onChange={onChangeHandler}
-                placeholder="e.g. 450 g"
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              Region / Origin
+            <label className="block">
+              <span className={labelClass}>Origin / Region</span>
               <input
                 type="text"
                 name="regionOrigin"
                 value={productInfo.regionOrigin}
                 onChange={onChangeHandler}
-                placeholder="e.g. Channapatna, Karnataka"
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm">
-              GI Tag (optional)
-              <select
-                name="giTag"
-                value={productInfo.giTag}
-                onChange={onChangeHandler}
-                className="rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
-              >
-                <option value="">None</option>
-                {GI_TAG_OPTIONS.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm sm:col-span-2">
-              Care Instructions
-              <textarea
-                name="careInstructions"
-                value={productInfo.careInstructions}
-                onChange={onChangeHandler}
-                rows={3}
-                placeholder="e.g. Wipe with a dry cloth; avoid prolonged moisture"
-                className="resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-brand-emerald"
+                placeholder="e.g., Saharanpur, Uttar Pradesh"
+                className={inputClass}
               />
             </label>
           </div>
 
-          <div className="mt-6 border-t border-slate-100 pt-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-medium text-slate-800">
-                Custom specifications
-              </h3>
-              <button
-                type="button"
-                onClick={addCustomSpec}
-                className="inline-flex items-center gap-1 rounded-md border border-brand-emerald/30 px-3 py-1.5 text-xs text-brand-emerald hover:bg-brand-emerald-soft"
+          <div className="mt-5 space-y-3 border-t border-slate-100 pt-5">
+            {customSpecs.map((row, index) => (
+              <div
+                key={`spec-${index}`}
+                className="flex flex-wrap items-center gap-2"
               >
-                <PlusIcon size={14} />
-                Add Specification
-              </button>
-            </div>
-            {customSpecs.length ? (
-              <div className="mt-3 space-y-2">
-                {customSpecs.map((row, index) => (
-                  <div key={`spec-${index}`} className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="text"
-                      value={row.key}
-                      onChange={(event) =>
-                        updateCustomSpec(index, "key", event.target.value)
-                      }
-                      placeholder="Attribute"
-                      className="min-w-[8rem] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-emerald"
-                    />
-                    <input
-                      type="text"
-                      value={row.value}
-                      onChange={(event) =>
-                        updateCustomSpec(index, "value", event.target.value)
-                      }
-                      placeholder="Value"
-                      className="min-w-[8rem] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-emerald"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeCustomSpec(index)}
-                      className="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                      aria-label="Remove specification"
-                    >
-                      <Trash2Icon size={16} />
-                    </button>
-                  </div>
-                ))}
+                <input
+                  type="text"
+                  value={row.key}
+                  onChange={(event) =>
+                    updateCustomSpec(index, "key", event.target.value)
+                  }
+                  placeholder="Attribute"
+                  className={`${inputClass} min-w-[8rem] flex-1`}
+                />
+                <input
+                  type="text"
+                  value={row.value}
+                  onChange={(event) =>
+                    updateCustomSpec(index, "value", event.target.value)
+                  }
+                  placeholder="Value"
+                  className={`${inputClass} min-w-[8rem] flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCustomSpec(index)}
+                  className="rounded-lg p-2.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  aria-label="Remove specification"
+                >
+                  <Trash2Icon size={16} />
+                </button>
               </div>
-            ) : (
-              <p className="mt-2 text-xs text-slate-400">
-                No custom attributes yet. Use Add Specification for unique traits.
-              </p>
-            )}
+            ))}
+            <button
+              type="button"
+              onClick={addCustomSpec}
+              className="inline-flex items-center justify-center rounded-lg border border-brand-emerald/25 bg-brand-emerald-soft/80 px-4 py-2.5 text-sm font-medium text-brand-emerald transition hover:bg-brand-emerald-soft"
+            >
+              + Add Custom Specification
+            </button>
           </div>
         </section>
       </div>
 
       {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-brand-gold/20 bg-brand-cream/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            {images.length < MIN_PHOTOS
-              ? `Add ${MIN_PHOTOS - images.length} more photo${MIN_PHOTOS - images.length === 1 ? "" : "s"} to publish`
-              : "Ready to save draft or publish"}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={Boolean(saving) || busy || !images.length}
-              onClick={() => void saveProduct(false)}
-              className="rounded-md border border-brand-emerald/40 bg-white px-4 py-2.5 text-sm text-brand-emerald transition hover:bg-brand-emerald-soft disabled:opacity-60"
-            >
-              {saving === "draft" ? "Saving draft…" : "Save Draft"}
-            </button>
-            <button
-              type="button"
-              disabled={
-                Boolean(saving) ||
-                busy ||
-                images.length < MIN_PHOTOS ||
-                images.length > MAX_PHOTOS
-              }
-              onClick={() => void saveProduct(true)}
-              className="rounded-md bg-brand-emerald px-4 py-2.5 text-sm text-white transition hover:bg-brand-amber disabled:opacity-60"
-            >
-              {saving === "publish" ? "Publishing…" : "Publish Product"}
-            </button>
-          </div>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-end gap-3 px-4 py-3 sm:px-0">
+          <button
+            type="button"
+            disabled={Boolean(saving) || busy || !filledCount}
+            onClick={() => void saveProduct(false)}
+            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            {saving === "draft" ? "Saving…" : "Save as Draft"}
+          </button>
+          <button
+            type="button"
+            disabled={
+              Boolean(saving) ||
+              busy ||
+              filledCount < MIN_PHOTOS ||
+              filledCount > MAX_PHOTOS
+            }
+            onClick={() => void saveProduct(true)}
+            className="rounded-lg bg-brand-emerald px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#036647] disabled:opacity-60"
+          >
+            {saving === "publish" ? "Publishing…" : "Publish Piece"}
+          </button>
         </div>
       </div>
     </div>

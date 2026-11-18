@@ -300,7 +300,7 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
         artisan.id,
         entry.product
       )
-      if (!productResult.ok) {
+      if ("error" in productResult) {
         results.push({
           key: entry.key,
           email,

@@ -14,8 +14,10 @@ import {
   sanitizeStaffPermissions,
   validateStaffRoleChange,
 } from "@/lib/staffValidation"
+import { DEMO_STAFF_SEED } from "@/lib/staffSeed"
 import { isSupabaseServiceConfigured } from "@/lib/supabase/config"
 import { tryCreateServiceClient } from "@/utils/supabase/admin"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export type StaffMemberDTO = {
   id: string
@@ -94,6 +96,23 @@ function isMissingStaffSchemaError(message?: string | null) {
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
+  )
+}
+
+function isLocalDemoStaffId(value: string) {
+  return Boolean(value) && !isUuid(value)
+}
+
+function isUuidSyntaxError(message?: string | null) {
+  if (!message) return false
+  return /invalid input syntax for type uuid/i.test(message)
+}
+
+function shouldFallbackFromRemote(message?: string | null) {
+  return (
+    isMissingStaffSchemaError(message) ||
+    isUuidSyntaxError(message) ||
+    /staff_(founder|main|ops|artisan|b2b)/i.test(message || "")
   )
 }
 
@@ -246,6 +265,210 @@ export async function listStaffUsers(): Promise<{
       source: "unavailable",
       error: error instanceof Error ? error.message : "Failed to load staff.",
     }
+  }
+}
+
+async function resolveOrCreateAuthUserId(
+  supabase: SupabaseClient,
+  email: string,
+  meta: { full_name: string; admin_role: string; is_founder?: boolean }
+): Promise<{ id: string; created: boolean } | { error: string }> {
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .maybeSingle()
+  if (existingProfile?.id) {
+    return { id: existingProfile.id, created: false }
+  }
+
+  const { data: created, error: createError } =
+    await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
+        full_name: meta.full_name,
+        role: "admin",
+        admin_role: meta.admin_role,
+        is_founder: Boolean(meta.is_founder),
+      },
+    })
+
+  if (created?.user?.id) {
+    return { id: created.user.id, created: true }
+  }
+
+  // User may already exist in Auth without a profiles row.
+  const { data: invited, error: inviteError } =
+    await supabase.auth.admin.inviteUserByEmail(email, {
+      data: {
+        full_name: meta.full_name,
+        role: "admin",
+        admin_role: meta.admin_role,
+      },
+    })
+  if (invited?.user?.id) {
+    return { id: invited.user.id, created: true }
+  }
+
+  const { data: listed } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  })
+  const users = (listed?.users || []) as Array<{ id: string; email?: string | null }>
+  const match = users.find(
+    (user) => (user.email || "").toLowerCase() === email.toLowerCase()
+  )
+  if (match?.id) {
+    return { id: match.id, created: false }
+  }
+
+  return {
+    error:
+      createError?.message ||
+      inviteError?.message ||
+      `Could not create or find Auth user for ${email}`,
+  }
+}
+
+async function upsertStaffProfile(
+  supabase: SupabaseClient,
+  input: {
+    id: string
+    email: string
+    name: string
+    portfolio: string
+    role: string
+    permissions: string[]
+    isFounder: boolean
+  }
+) {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: input.id,
+        email: input.email,
+        full_name: input.name,
+        role: "admin",
+        admin_role: input.role,
+        permissions:
+          input.role === AdminRole.SUPER_ADMIN ? ["*"] : input.permissions,
+        is_founder: input.isFounder,
+        portfolio: input.portfolio,
+      },
+      { onConflict: "id" }
+    )
+    .select(
+      "id, email, full_name, avatar_url, portfolio, admin_role, permissions, is_founder"
+    )
+    .single()
+
+  if (error || !profile) {
+    return {
+      ok: false as const,
+      error: error?.message || "Profile upsert failed.",
+    }
+  }
+  return { ok: true as const, profile }
+}
+
+/**
+ * Connect every demo staff directory member (Jordan, Rahul, Meera, Sofia, founder)
+ * to Supabase Auth + profiles so /admin/staff is no longer local-only.
+ */
+export async function connectDemoStaffToSupabase(): Promise<{
+  ok: boolean
+  connected: StaffMemberDTO[]
+  results: Array<{
+    email: string
+    ok: boolean
+    created?: boolean
+    error?: string
+  }>
+  source: "supabase" | "unavailable"
+  error?: string
+}> {
+  const supabase = tryCreateServiceClient()
+  if (!supabase) {
+    return {
+      ok: false,
+      connected: [],
+      results: [],
+      source: "unavailable",
+      error:
+        "SUPABASE_SERVICE_ROLE_KEY is required to connect staff. Also run 20261118_staff_admin_profiles.sql.",
+    }
+  }
+
+  const results: Array<{
+    email: string
+    ok: boolean
+    created?: boolean
+    error?: string
+  }> = []
+  const connected: StaffMemberDTO[] = []
+
+  for (const member of DEMO_STAFF_SEED) {
+    const email = member.email.toLowerCase()
+    const resolved = await resolveOrCreateAuthUserId(supabase, email, {
+      full_name: member.name,
+      admin_role: member.role,
+      is_founder: member.isFounder,
+    })
+
+    if ("error" in resolved) {
+      results.push({ email, ok: false, error: resolved.error })
+      continue
+    }
+
+    const upserted = await upsertStaffProfile(supabase, {
+      id: resolved.id,
+      email,
+      name: member.name,
+      portfolio: member.portfolio,
+      role: member.role,
+      permissions: [...member.permissions],
+      isFounder: member.isFounder,
+    })
+
+    if (!upserted.ok) {
+      if (isMissingStaffSchemaError(upserted.error)) {
+        return {
+          ok: false,
+          connected,
+          results: [
+            ...results,
+            {
+              email,
+              ok: false,
+              error: `${upserted.error}. ${STAFF_MIGRATION_HINT}`,
+            },
+          ],
+          source: "unavailable",
+          error: STAFF_MIGRATION_HINT,
+        }
+      }
+      results.push({ email, ok: false, error: upserted.error })
+      continue
+    }
+
+    const mapped = mapSupabaseProfile(upserted.profile)
+    await syncPrismaStaff(mapped)
+    connected.push(toStaffDTO(mapped, "supabase"))
+    results.push({ email, ok: true, created: resolved.created })
+  }
+
+  revalidateStaffPaths()
+  const allOk = results.length > 0 && results.every((row) => row.ok)
+  return {
+    ok: allOk,
+    connected,
+    results,
+    source: connected.length ? "supabase" : "unavailable",
+    error: allOk
+      ? undefined
+      : "Some staff could not be connected. Check results and Supabase Auth logs.",
   }
 }
 
@@ -436,6 +659,15 @@ export async function removeStaffMember(userId: string): Promise<
     return { ok: false, code: "VALIDATION", error: "userId is required." }
   }
 
+  if (isLocalDemoStaffId(userId)) {
+    return {
+      ok: false,
+      code: "DB_UNAVAILABLE",
+      error:
+        "Local demo staff id — remove from browser registry, or Add staff via Supabase invite for cloud sync.",
+    }
+  }
+
   const supabase = tryCreateServiceClient()
   if (supabase) {
     try {
@@ -448,6 +680,13 @@ export async function removeStaffMember(userId: string): Promise<
         .maybeSingle()
 
       if (error) {
+        if (shouldFallbackFromRemote(error.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${error.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return { ok: false, code: "UNKNOWN", error: error.message }
       }
       if (!profile) {
@@ -665,12 +904,27 @@ export async function updateStaffRoleAndPermissions(input: {
   ok: boolean
   staff?: StaffMemberDTO
   error?: string
-  code?: "DB_UNAVAILABLE" | "VALIDATION" | "NOT_FOUND" | "UNKNOWN"
+  code?:
+    | "DB_UNAVAILABLE"
+    | "SUPABASE_UNAVAILABLE"
+    | "VALIDATION"
+    | "NOT_FOUND"
+    | "UNKNOWN"
 }> {
   const { userId, newRole, newPermissions = [] } = input || {}
 
   if (!userId) {
     return { ok: false, code: "VALIDATION", error: "userId is required." }
+  }
+
+  // Demo registry ids (staff_main, staff_ops, …) are not auth UUIDs.
+  if (isLocalDemoStaffId(userId)) {
+    return {
+      ok: false,
+      code: "DB_UNAVAILABLE",
+      error:
+        "Local demo staff — saved in browser until you Add staff (Supabase invite) or promote real profiles.",
+    }
   }
 
   const supabase = tryCreateServiceClient()
@@ -685,6 +939,13 @@ export async function updateStaffRoleAndPermissions(input: {
         .maybeSingle()
 
       if (error) {
+        if (shouldFallbackFromRemote(error.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${error.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return { ok: false, code: "UNKNOWN", error: error.message }
       }
       if (!profile) {
@@ -741,6 +1002,13 @@ export async function updateStaffRoleAndPermissions(input: {
         .single()
 
       if (updateError || !updated) {
+        if (shouldFallbackFromRemote(updateError?.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${updateError?.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return {
           ok: false,
           code: "UNKNOWN",
@@ -757,13 +1025,21 @@ export async function updateStaffRoleAndPermissions(input: {
       revalidateStaffPaths()
       return { ok: true, staff: toStaffDTO(mapped, "supabase") }
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update staff member."
+      if (shouldFallbackFromRemote(message)) {
+        return {
+          ok: false,
+          code: "SUPABASE_UNAVAILABLE",
+          error: `${message}. ${STAFF_MIGRATION_HINT}`,
+        }
+      }
       return {
         ok: false,
         code: "UNKNOWN",
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update staff member.",
+        error: message,
       }
     }
   }

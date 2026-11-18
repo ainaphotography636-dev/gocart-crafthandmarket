@@ -64,6 +64,18 @@ where email = 'YOUR_FOUNDER_EMAIL@example.com';
 
 `/admin/staff` then lists Supabase staff profiles. Super Admin can **Add staff** (Auth invite), **Remove**, and **Edit profile** (name + portfolio).
 
+### Connect the full demo directory (Jordan, Rahul, Meera, Sofia + founder)
+
+On `/admin/staff`, click **Connect all to Supabase**. That creates (or reuses) Auth users for:
+
+- `aina@crafthand.market` — Super Admin / founder  
+- `jordan@crafthand.market` — Main Admin  
+- `rahul@crafthand.market` — Operations  
+- `meera@crafthand.market` — Artisan Lead  
+- `sofia@crafthand.market` — B2B Trade  
+
+Requires `SUPABASE_SERVICE_ROLE_KEY` and the staff profiles migration above.
+
 The scripts are idempotent where possible (`IF NOT EXISTS`, `OR REPLACE`).
 
 ## 4. Enable Auth providers + email delivery

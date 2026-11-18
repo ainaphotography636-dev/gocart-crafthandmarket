@@ -5,6 +5,7 @@
  */
 export {
   addStaffMember,
+  connectDemoStaffToSupabase,
   listStaffUsers,
   removeStaffMember,
   updateStaffProfile,

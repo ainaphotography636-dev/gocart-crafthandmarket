@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import {
+  CloudUploadIcon,
   LockIcon,
   PencilIcon,
   PlusIcon,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/staffRegistry"
 import {
   addStaffMember,
+  connectDemoStaffToSupabase,
   listStaffUsers,
   removeStaffMember,
   updateStaffProfile,
@@ -56,6 +58,7 @@ export default function AdminStaffPage() {
   const [profileDraft, setProfileDraft] = useState({ name: "", portfolio: "" })
   const [draftRole, setDraftRole] = useState(AdminRole.MAIN_ADMIN)
   const [draftPermissions, setDraftPermissions] = useState([])
+  const [connecting, setConnecting] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -116,7 +119,14 @@ export default function AdminStaffPage() {
         return result.staff
       }
 
-      if (result.code === "DB_UNAVAILABLE") {
+      const fallbackLocal =
+        result.code === "DB_UNAVAILABLE" ||
+        result.code === "SUPABASE_UNAVAILABLE" ||
+        /invalid input syntax for type uuid|staff_(founder|main|ops|artisan|b2b)|Local demo/i.test(
+          result.error || ""
+        )
+
+      if (fallbackLocal) {
         const defaults = getPermissionsForRole(newRole)
         const sameAsDefaults =
           defaults.length === newPermissions.length &&
@@ -129,7 +139,9 @@ export default function AdminStaffPage() {
         setSource("local")
         if (closeModal) setEditingId(null)
         toast.success(
-          "Saved locally (connect Supabase service role / DATABASE_URL to persist)"
+          /staff_|Local demo|uuid/i.test(result.error || "")
+            ? "Saved locally — demo staff ids are not Supabase UUIDs. Use Add staff to invite real accounts."
+            : "Saved locally (run staff migration + Add staff for Supabase sync)"
         )
         return null
       }
@@ -137,8 +149,26 @@ export default function AdminStaffPage() {
       toast.error(result.error || "Could not update staff member.")
       return null
     } catch (error) {
-      toast.error(error?.message || "Could not update staff member.")
-      return null
+      try {
+        const defaults = getPermissionsForRole(newRole)
+        const sameAsDefaults =
+          defaults.length === newPermissions.length &&
+          defaults.every((permission) => newPermissions.includes(permission))
+        applyLocalUpdate(
+          userId,
+          newRole,
+          sameAsDefaults ? [] : newPermissions
+        )
+        setSource("local")
+        if (closeModal) setEditingId(null)
+        toast.success("Saved locally")
+        return null
+      } catch (localError) {
+        toast.error(
+          localError?.message || error?.message || "Could not update staff member."
+        )
+        return null
+      }
     } finally {
       setSavingId("")
     }
@@ -353,6 +383,34 @@ export default function AdminStaffPage() {
     window.location.href = "/admin"
   }
 
+  const connectAllStaff = async () => {
+    setConnecting(true)
+    try {
+      const result = await connectDemoStaffToSupabase()
+      if (result.connected?.length) {
+        setStaff(result.connected)
+        setSource("supabase")
+      }
+      const failed = (result.results || []).filter((row) => !row.ok)
+      if (result.ok) {
+        toast.success(
+          `Connected ${result.connected.length} staff accounts to Supabase`
+        )
+      } else if (result.connected?.length) {
+        toast.error(
+          `Connected ${result.connected.length}; ${failed.length} failed — ${failed[0]?.error || result.error || ""}`
+        )
+      } else {
+        toast.error(result.error || failed[0]?.error || "Could not connect staff")
+      }
+      await refresh()
+    } catch (error) {
+      toast.error(error?.message || "Could not connect staff to Supabase")
+    } finally {
+      setConnecting(false)
+    }
+  }
+
   const sourceLabel =
     source === "supabase"
       ? "Supabase profiles"
@@ -382,15 +440,51 @@ export default function AdminStaffPage() {
             {loading ? " · loading…" : ""}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-brand-emerald px-4 py-2.5 text-sm text-white transition hover:bg-brand-amber"
-        >
-          <PlusIcon size={16} />
-          Add staff
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={connecting}
+            onClick={() => void connectAllStaff()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-brand-emerald/40 bg-white px-4 py-2.5 text-sm text-brand-emerald transition hover:bg-brand-emerald-soft disabled:opacity-60"
+          >
+            <CloudUploadIcon size={16} />
+            {connecting ? "Connecting…" : "Connect all to Supabase"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-brand-emerald px-4 py-2.5 text-sm text-white transition hover:bg-brand-amber"
+          >
+            <PlusIcon size={16} />
+            Add staff
+          </button>
+        </div>
       </div>
+
+      {source === "local" ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Using local demo staff</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
+            Jordan, Rahul, Meera, Sofia (and founder) are still browser-only.
+            Run <code>20261118_staff_admin_profiles.sql</code>, set{" "}
+            <code>SUPABASE_SERVICE_ROLE_KEY</code>, then click{" "}
+            <strong>Connect all to Supabase</strong> to create Auth users +
+            profile rows for every directory member.
+          </p>
+        </div>
+      ) : null}
+
+      {source === "supabase" ? (
+        <div className="mt-4 rounded-xl border border-brand-emerald/25 bg-brand-emerald-soft/70 px-4 py-3 text-sm text-brand-ink">
+          <p className="font-medium text-brand-emerald">Connected to Supabase</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Staff rows use Auth UUIDs. Edit profile, permissions, add, and remove
+            sync to <code>profiles</code>. Re-run{" "}
+            <strong>Connect all to Supabase</strong> anytime to upsert the
+            canonical directory (Aina, Jordan, Rahul, Meera, Sofia).
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-3 md:grid-cols-5">
         {ROLE_HIERARCHY.map((role, index) => (

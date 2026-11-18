@@ -107,14 +107,15 @@ export default function RecentlyAddedGallery({ products = [] }) {
       {count === 0 ? (
         <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center">
           <p className="text-sm text-slate-600">
-            No published pieces yet. Artisans can add products from the portal —
-            once published, they show up here.
+            No storefront pieces yet. Sign in, open Add Product, upload 4+ photos,
+            then click <span className="font-medium text-slate-800">Publish Piece</span> —
+            your workshop and product will appear here.
           </p>
           <Link
-            href="/shop"
+            href="/store/add-product"
             className="mt-4 inline-flex text-sm font-medium text-brand-emerald hover:text-brand-amber"
           >
-            Browse the shop
+            Add a product
           </Link>
         </div>
       ) : (

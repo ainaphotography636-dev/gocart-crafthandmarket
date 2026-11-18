@@ -6,6 +6,7 @@ import toast from "react-hot-toast"
 import { listPendingStores, updateStoreStatus } from "@/lib/storeRegistry"
 import { notifyStoreEvent } from "@/lib/notifyClient"
 import { syncArtisanToR2 } from "@/lib/artisanDirectory"
+import { approveArtisanInSupabase } from "@/app/actions/artisan-approval"
 
 export default function AdminApprove() {
     const [stores, setStores] = useState([])
@@ -24,21 +25,32 @@ export default function AdminApprove() {
         const event = status === "approved" ? "store_approved" : "store_rejected"
         const notify = await notifyStoreEvent(event, updated)
 
+        const cloud = await approveArtisanInSupabase({
+            username: updated.username,
+            artisanCode: updated.artisanCode,
+            email: updated.email || updated.user?.email,
+            status: status === "approved" ? "approved" : "rejected",
+        })
+
         if (status === "approved") {
             try {
                 await syncArtisanToR2(updated)
-                toast.success(
-                    notify.ok && !notify.skipped
-                        ? "Store approved — profile synced to R2 & artisan emailed"
-                        : "Store approved — artisan profile synced to Cloudflare R2"
-                )
+                if (cloud.ok) {
+                    toast.success(
+                        "Store approved — live on Supabase storefront + R2"
+                    )
+                } else {
+                    toast.success(
+                        notify.ok && !notify.skipped
+                            ? "Store approved locally — profile synced to R2 & emailed"
+                            : `Store approved locally${cloud.error ? ` (${cloud.error})` : ""}`
+                    )
+                }
             } catch {
                 toast.success(
-                    notify.skipped
-                        ? "Store approved (R2/email not fully configured)"
-                        : notify.ok
-                          ? "Store approved — artisan emailed"
-                          : "Store approved"
+                    cloud.ok
+                        ? "Store approved — live on Supabase storefront"
+                        : "Store approved locally"
                 )
             }
         } else if (notify.skipped) {

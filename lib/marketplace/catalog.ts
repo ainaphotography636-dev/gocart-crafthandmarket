@@ -1,6 +1,11 @@
 import "server-only"
 
 import { mapArtisanRow, mapProductRow } from "@/lib/marketplace/mappers"
+import {
+  isMissingColumnError,
+  PRODUCT_SELECT_COMPAT,
+  PRODUCT_SELECT_FULL,
+} from "@/lib/marketplace/productSelect"
 import type {
   ArtisanStorefront,
   StorefrontArtisan,
@@ -9,50 +14,29 @@ import type {
 import { isSupabaseConfigured } from "@/lib/supabase/config"
 import { createClient } from "@/utils/supabase/server"
 
-const PRODUCT_SELECT = `
-  id,
-  artisan_id,
-  title,
-  description,
-  category,
-  material,
-  gi_tag,
-  craft_technique,
-  dimensions,
-  weight,
-  region_origin,
-  care_instructions,
-  specs,
-  sku,
-  price_inr,
-  mrp_inr,
-  price_usd,
-  mrp_usd,
-  currency_default,
-  images,
-  video_proof_url,
-  in_stock,
-  is_published,
-  created_at,
-  artisans (
-    id,
-    artisan_code,
-    workshop_name,
-    username,
-    description,
-    logo_url,
-    region,
-    address,
-    gi_tags,
-    verification_status,
-    is_active
-  )
-`
-
 export type CatalogListResult<T> = {
   items: T[]
   source: "supabase" | "unavailable" | "error"
   error?: string
+}
+
+type SupabaseServer = Awaited<ReturnType<typeof createClient>>
+
+async function queryProducts(
+  supabase: SupabaseServer,
+  apply: (
+    select: string
+  ) => PromiseLike<{ data: unknown; error: { message?: string } | null }>
+) {
+  const full = await apply(PRODUCT_SELECT_FULL)
+  if (!full.error) return full
+
+  if (isMissingColumnError(full.error)) {
+    const compat = await apply(PRODUCT_SELECT_COMPAT)
+    return compat
+  }
+
+  return full
 }
 
 /**
@@ -72,26 +56,30 @@ export async function listStorefrontProducts(options?: {
   try {
     const supabase = await createClient()
     const requireInStock = options?.requireInStock !== false
-    let query = supabase
-      .from("products")
-      .select(PRODUCT_SELECT)
-      .eq("is_published", true)
-      .order("created_at", { ascending: false })
 
-    if (requireInStock) {
-      query = query.eq("in_stock", true)
-    }
+    const { data, error } = await queryProducts(supabase, (select) => {
+      let query = supabase
+        .from("products")
+        .select(select)
+        .eq("is_published", true)
+        .order("created_at", { ascending: false })
 
-    if (options?.limit) {
-      query = query.limit(options.limit)
-    }
+      if (requireInStock) {
+        query = query.eq("in_stock", true)
+      }
+      if (options?.limit) {
+        query = query.limit(options.limit)
+      }
+      return query
+    })
 
-    const { data, error } = await query
     if (error) {
       return { items: [], source: "error", error: error.message }
     }
 
-    let products = (data || []).map((row) => mapProductRow(row as never))
+    let products = (Array.isArray(data) ? data : []).map((row) =>
+      mapProductRow(row as never)
+    )
 
     const search = String(options?.search || "")
       .trim()
@@ -178,7 +166,11 @@ export async function listStorefrontArtisans(options?: {
 
 export async function getStorefrontProductById(
   productId: string
-): Promise<{ product: StorefrontProduct | null; source: CatalogListResult<never>["source"]; error?: string }> {
+): Promise<{
+  product: StorefrontProduct | null
+  source: CatalogListResult<never>["source"]
+  error?: string
+}> {
   if (!isSupabaseConfigured()) {
     return { product: null, source: "unavailable" }
   }
@@ -188,12 +180,14 @@ export async function getStorefrontProductById(
 
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase
-      .from("products")
-      .select(PRODUCT_SELECT)
-      .eq("id", id)
-      .eq("is_published", true)
-      .maybeSingle()
+    const { data, error } = await queryProducts(supabase, (select) =>
+      supabase
+        .from("products")
+        .select(select)
+        .eq("id", id)
+        .eq("is_published", true)
+        .maybeSingle()
+    )
 
     if (error) {
       return { product: null, source: "error", error: error.message }
@@ -261,19 +255,25 @@ export async function getArtisanStorefrontByUsername(
 
     const artisan = mapArtisanRow(artisanRow as never)
 
-    const { data: productRows, error: productError } = await supabase
-      .from("products")
-      .select(PRODUCT_SELECT)
-      .eq("artisan_id", artisan.id)
-      .eq("is_published", true)
-      .eq("in_stock", true)
-      .order("created_at", { ascending: false })
+    const { data: productRows, error: productError } = await queryProducts(
+      supabase,
+      (select) =>
+        supabase
+          .from("products")
+          .select(select)
+          .eq("artisan_id", artisan.id)
+          .eq("is_published", true)
+          .eq("in_stock", true)
+          .order("created_at", { ascending: false })
+    )
 
     if (productError) {
       return { store: null, source: "error", error: productError.message }
     }
 
-    const products = (productRows || []).map((row) => mapProductRow(row as never))
+    const products = (Array.isArray(productRows) ? productRows : []).map((row) =>
+      mapProductRow(row as never)
+    )
 
     return {
       store: {

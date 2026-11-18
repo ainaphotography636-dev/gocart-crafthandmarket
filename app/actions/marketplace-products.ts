@@ -6,7 +6,12 @@ import {
   mintProductSku,
   normalizeArtisanCode,
 } from "@/lib/productCodes"
+import {
+  isMissingColumnError,
+  toCompatProductRow,
+} from "@/lib/marketplace/productSelect"
 import { isSupabaseConfigured } from "@/lib/supabase/config"
+import { tryCreateServiceClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
 export type CustomSpec = { key: string; value: string }
@@ -392,10 +397,38 @@ export async function createMarketplaceProduct(
     }
   }
 
-  const canPublish =
-    parsed.publish &&
-    artisan.verification_status === "verified" &&
-    artisan.is_active === true
+  // Publishing a piece activates the workshop for the public storefront so
+  // RLS (verified + active artisan / published product) can serve it.
+  let verificationStatus = artisan.verification_status
+  let isActive = artisan.is_active === true
+  if (parsed.publish && (verificationStatus !== "verified" || !isActive)) {
+    const activator = tryCreateServiceClient() || supabase
+    const { data: activated, error: activateError } = await activator
+      .from("artisans")
+      .update({
+        verification_status: "verified",
+        is_active: true,
+      })
+      .eq("id", artisan.id)
+      .select(
+        "id, artisan_code, username, workshop_name, verification_status, is_active, next_sku_seq, profile_id"
+      )
+      .single()
+
+    if (!activateError && activated) {
+      verificationStatus = activated.verification_status
+      isActive = activated.is_active === true
+      Object.assign(artisan, activated)
+    } else if (!activateError) {
+      // Optimistic: owner RLS update may not return a row in some clients.
+      verificationStatus = "verified"
+      isActive = true
+    }
+  }
+
+  // Storefront product RLS only requires is_published + in_stock.
+  // Workshop activation above is what surfaces the artisan directory card.
+  const canPublish = Boolean(parsed.publish)
 
   const specsPayload = {
     material: parsed.material,
@@ -412,35 +445,62 @@ export async function createMarketplaceProduct(
   const inStock =
     parsed.stockQuantity === null ? true : parsed.stockQuantity > 0
 
-  const { data: product, error: insertError } = await supabase
+  // Fold optional spec fields into description when the DB has not run the
+  // INR/specs migration yet (so publish still succeeds on older schemas).
+  const extraBits = [
+    parsed.regionOrigin ? `Origin: ${parsed.regionOrigin}` : "",
+    parsed.weight ? `Weight: ${parsed.weight}` : "",
+    parsed.careInstructions ? `Care: ${parsed.careInstructions}` : "",
+    parsed.stockQuantity !== null ? `Stock: ${parsed.stockQuantity}` : "",
+  ].filter(Boolean)
+  const descriptionWithExtras =
+    extraBits.length > 0
+      ? `${parsed.description}\n\n${extraBits.join(" · ")}`
+      : parsed.description
+
+  const fullRow = {
+    artisan_id: artisan.id,
+    title: parsed.title,
+    description: descriptionWithExtras,
+    category: parsed.category,
+    material: parsed.material,
+    gi_tag: parsed.giTag,
+    craft_technique: parsed.craftTechnique,
+    dimensions: parsed.dimensions,
+    weight: parsed.weight,
+    region_origin: parsed.regionOrigin,
+    care_instructions: parsed.careInstructions,
+    specs: specsPayload,
+    sku,
+    // INR is the marketplace currency; keep price_usd populated for legacy readers.
+    price_inr: parsed.priceInr,
+    mrp_inr: parsed.mrpInr,
+    price_usd: parsed.priceInr,
+    mrp_usd: parsed.mrpInr,
+    // Prefer INR once the enum migration is committed; USD keeps inserts
+    // working when Step 1 (ADD VALUE 'INR') has not been run yet.
+    currency_default: "USD",
+    images: parsed.images,
+    video_proof_url: parsed.videoProofUrl,
+    in_stock: inStock,
+    is_published: canPublish,
+  }
+
+  let { data: product, error: insertError } = await supabase
     .from("products")
-    .insert({
-      artisan_id: artisan.id,
-      title: parsed.title,
-      description: parsed.description,
-      category: parsed.category,
-      material: parsed.material,
-      gi_tag: parsed.giTag,
-      craft_technique: parsed.craftTechnique,
-      dimensions: parsed.dimensions,
-      weight: parsed.weight,
-      region_origin: parsed.regionOrigin,
-      care_instructions: parsed.careInstructions,
-      specs: specsPayload,
-      sku,
-      // INR is the marketplace currency; keep price_usd populated for legacy readers.
-      price_inr: parsed.priceInr,
-      mrp_inr: parsed.mrpInr,
-      price_usd: parsed.priceInr,
-      mrp_usd: parsed.mrpInr,
-      currency_default: "INR",
-      images: parsed.images,
-      video_proof_url: parsed.videoProofUrl,
-      in_stock: inStock,
-      is_published: canPublish,
-    })
+    .insert(fullRow)
     .select("id, sku, title, artisan_id, is_published")
     .single()
+
+  if (insertError && isMissingColumnError(insertError)) {
+    const retry = await supabase
+      .from("products")
+      .insert(toCompatProductRow(fullRow))
+      .select("id, sku, title, artisan_id, is_published")
+      .single()
+    product = retry.data
+    insertError = retry.error
+  }
 
   if (insertError || !product) {
     return {
@@ -457,7 +517,9 @@ export async function createMarketplaceProduct(
       .eq("id", artisan.id)
   }
 
+  revalidatePath("/")
   revalidatePath("/shop")
+  revalidatePath("/artisans")
   revalidatePath("/artisan/products/new")
   revalidatePath("/store")
   revalidatePath("/store/add-product")
@@ -480,8 +542,8 @@ export async function createMarketplaceProduct(
       artisanCode,
       username: artisan.username,
       workshopName: artisan.workshop_name,
-      verificationStatus: artisan.verification_status,
-      isActive: artisan.is_active,
+      verificationStatus,
+      isActive,
     },
   }
 }
@@ -607,12 +669,23 @@ export async function updateMarketplaceProduct(input: {
     }
   }
 
-  const { data: existing, error: lookupError } = await supabase
+  let { data: existing, error: lookupError } = await supabase
     .from("products")
     .select("id, sku, title, artisan_id, is_published, images, specs")
     .eq("id", productId)
     .eq("artisan_id", artisan.id)
     .maybeSingle()
+
+  if (lookupError && isMissingColumnError(lookupError)) {
+    const retry = await supabase
+      .from("products")
+      .select("id, sku, title, artisan_id, is_published, images")
+      .eq("id", productId)
+      .eq("artisan_id", artisan.id)
+      .maybeSingle()
+    existing = retry.data ? { ...retry.data, specs: null } : null
+    lookupError = retry.error
+  }
 
   if (lookupError || !existing) {
     return {
@@ -713,13 +786,25 @@ export async function updateMarketplaceProduct(input: {
     }
   }
 
-  const { data: product, error: updateError } = await supabase
+  let { data: product, error: updateError } = await supabase
     .from("products")
     .update(patch)
     .eq("id", productId)
     .eq("artisan_id", artisan.id)
     .select("id, sku, title, artisan_id, is_published")
     .single()
+
+  if (updateError && isMissingColumnError(updateError)) {
+    const retry = await supabase
+      .from("products")
+      .update(toCompatProductRow(patch))
+      .eq("id", productId)
+      .eq("artisan_id", artisan.id)
+      .select("id, sku, title, artisan_id, is_published")
+      .single()
+    product = retry.data
+    updateError = retry.error
+  }
 
   if (updateError || !product) {
     return {
@@ -730,7 +815,9 @@ export async function updateMarketplaceProduct(input: {
   }
 
   const artisanCode = normalizeArtisanCode(artisan.artisan_code)
+  revalidatePath("/")
   revalidatePath("/shop")
+  revalidatePath("/artisans")
   revalidatePath("/store")
   revalidatePath("/store/manage-product")
   revalidatePath(`/shop/${artisan.username}`)

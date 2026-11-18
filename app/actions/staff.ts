@@ -81,6 +81,22 @@ function revalidateStaffPaths() {
   revalidatePath("/admin")
 }
 
+const STAFF_MIGRATION_HINT =
+  "Run supabase/migrations/20261118_staff_admin_profiles.sql in the Supabase SQL editor, then retry."
+
+function isMissingStaffSchemaError(message?: string | null) {
+  if (!message) return false
+  return /portfolio|admin_role|is_founder|permissions|schema cache|does not exist|PGRST204|column/i.test(
+    message
+  )
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  )
+}
+
 function mapSupabaseProfile(row: {
   id: string
   email?: string | null
@@ -334,12 +350,19 @@ export async function addStaffMember(input: {
         .single()
 
       if (profileError || !profile) {
+        if (isMissingStaffSchemaError(profileError?.message)) {
+          return {
+            ok: false,
+            code: "SUPABASE_UNAVAILABLE",
+            error: `${profileError?.message}. ${STAFF_MIGRATION_HINT}`,
+          }
+        }
         return {
           ok: false,
           code: "UNKNOWN",
           error:
             profileError?.message ||
-            "Staff invited but profile sync failed. Run 20261118_staff_admin_profiles.sql.",
+            `Staff invited but profile sync failed. ${STAFF_MIGRATION_HINT}`,
         }
       }
 
@@ -546,7 +569,8 @@ export async function updateStaffProfile(input: {
     return { ok: false, code: "VALIDATION", error: "Staff name is required." }
   }
 
-  const supabase = tryCreateServiceClient()
+  // Local demo ids are not Supabase auth UUIDs — skip service-role update.
+  const supabase = isUuid(userId) ? tryCreateServiceClient() : null
   if (supabase) {
     const { data: profile, error } = await supabase
       .from("profiles")
@@ -561,12 +585,17 @@ export async function updateStaffProfile(input: {
       .maybeSingle()
 
     if (error) {
+      if (isMissingStaffSchemaError(error.message)) {
+        return {
+          ok: false,
+          code: "SUPABASE_UNAVAILABLE",
+          error: `${error.message}. ${STAFF_MIGRATION_HINT}`,
+        }
+      }
       return {
         ok: false,
         code: "UNKNOWN",
-        error:
-          error.message ||
-          "Could not update profile. Run 20261118_staff_admin_profiles.sql.",
+        error: error.message || `Could not update profile. ${STAFF_MIGRATION_HINT}`,
       }
     }
     if (!profile) {
@@ -579,11 +608,13 @@ export async function updateStaffProfile(input: {
     return { ok: true, source: "supabase", staff: toStaffDTO(mapped, "supabase") }
   }
 
-  if (!isDatabaseConfigured()) {
+  if (!isDatabaseConfigured() || !isUuid(userId)) {
     return {
       ok: false,
       code: "DB_UNAVAILABLE",
-      error: "Database is not configured.",
+      error: isUuid(userId)
+        ? "Database is not configured."
+        : "Local demo staff — saved in browser registry until Supabase staff migration is applied.",
     }
   }
 
@@ -605,13 +636,19 @@ export async function updateStaffProfile(input: {
     revalidateStaffPaths()
     return { ok: true, source: "prisma", staff: toStaffDTO(updated, "prisma") }
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to update staff profile."
+    if (isMissingStaffSchemaError(message)) {
+      return {
+        ok: false,
+        code: "DB_UNAVAILABLE",
+        error: `${message}. Add User.portfolio via Prisma migrate, or ${STAFF_MIGRATION_HINT}`,
+      }
+    }
     return {
       ok: false,
       code: "UNKNOWN",
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update staff profile.",
+      error: message,
     }
   }
 }

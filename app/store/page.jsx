@@ -1,9 +1,9 @@
 'use client'
-import { dummyStoreDashboardData } from "@/assets/assets"
 import Loading from "@/components/shared/Loading"
 import { useCurrency } from "@/components/shared/CurrencyProvider"
 import { getActiveStore } from "@/lib/storeRegistry"
 import { getStoreDashboardStats } from "@/lib/productCatalog"
+import { getArtisanWorkshopCatalog } from "@/app/actions/artisan-dashboard"
 import { formatProductTitle } from "@/lib/productCodes"
 import { getProductThumbnailUrl } from "@/lib/marketplace/media"
 import {
@@ -27,6 +27,8 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(true)
   const [store, setStore] = useState(null)
+  const [source, setSource] = useState("local")
+  const [authHint, setAuthHint] = useState("")
   const [dashboardData, setDashboardData] = useState({
     totalProducts: 0,
     inStock: 0,
@@ -39,19 +41,45 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     const active = getActiveStore()
-    const stats = getStoreDashboardStats()
-    const hasOwnCatalog = stats.totalProducts > 0
-
     setStore(active)
+
+    const cloud = await getArtisanWorkshopCatalog()
+    if (cloud.ok) {
+      setSource("supabase")
+      setAuthHint("")
+      setDashboardData({
+        totalProducts: cloud.stats.totalProducts,
+        inStock: cloud.stats.inStock,
+        withVideo: cloud.stats.withVideo,
+        totalEarnings: cloud.stats.totalEarnings,
+        totalOrders: cloud.stats.totalOrders,
+        ratings: cloud.stats.ratings,
+        recentProducts: cloud.products.slice(0, 6),
+      })
+      setLoading(false)
+      return
+    }
+
+    // Fall back to this browser's workshop catalog only — never show dummy market stats.
+    const stats = getStoreDashboardStats()
+    setSource(stats.totalProducts ? "local" : "empty")
+    setAuthHint(
+      cloud.code === "UNAUTHORIZED"
+        ? "Sign in to sync your Supabase workshop catalog."
+        : cloud.code === "ARTISAN"
+          ? cloud.error
+          : cloud.code === "QUERY"
+            ? cloud.error
+            : ""
+    )
     setDashboardData({
-      totalProducts: hasOwnCatalog ? stats.totalProducts : dummyStoreDashboardData.totalProducts,
-      inStock: hasOwnCatalog ? stats.inStock : dummyStoreDashboardData.totalProducts,
+      totalProducts: stats.totalProducts,
+      inStock: stats.inStock,
       withVideo: stats.withVideo,
-      totalEarnings: hasOwnCatalog ? 0 : dummyStoreDashboardData.totalEarnings,
-      totalOrders: hasOwnCatalog ? 0 : dummyStoreDashboardData.totalOrders,
-      ratings: hasOwnCatalog ? stats.ratings : dummyStoreDashboardData.ratings,
-      recentProducts: stats.recentProducts,
-      usingSample: !hasOwnCatalog,
+      totalEarnings: 0,
+      totalOrders: 0,
+      ratings: stats.ratings || [],
+      recentProducts: stats.recentProducts || [],
     })
     setLoading(false)
   }
@@ -147,11 +175,19 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {dashboardData.usingSample && (
-        <p className="text-sm text-slate-500 mb-6 max-w-3xl">
-          Showing sample market stats until you add your first workshop product.
+      {source === "supabase" ? (
+        <p className="text-xs text-slate-400 mb-6 max-w-3xl">
+          Catalog synced from your signed-in Supabase workshop.
         </p>
-      )}
+      ) : null}
+      {authHint ? (
+        <p className="text-sm text-amber-700 mb-6 max-w-3xl">{authHint}</p>
+      ) : null}
+      {source === "empty" && !authHint ? (
+        <p className="text-sm text-slate-500 mb-6 max-w-3xl">
+          No workshop products yet. Add your first piece to populate these stats.
+        </p>
+      ) : null}
 
       <section className="max-w-5xl mb-12">
         <div className="flex items-end justify-between gap-3 mb-4">
@@ -183,6 +219,11 @@ export default function Dashboard() {
                   {product.video ? (
                     <span className="absolute left-3 top-3 text-[11px] uppercase tracking-wide bg-brand-ink/80 text-white px-2 py-1 rounded">
                       Video
+                    </span>
+                  ) : null}
+                  {product.isPublished === false ? (
+                    <span className="absolute right-3 top-3 text-[11px] uppercase tracking-wide bg-slate-700/80 text-white px-2 py-1 rounded">
+                      Draft
                     </span>
                   ) : null}
                 </div>

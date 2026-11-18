@@ -12,7 +12,7 @@ import {
   toggleProductStock,
   updateProduct,
 } from "@/lib/productCatalog"
-import { productDummyData } from "@/assets/assets"
+import { getArtisanWorkshopCatalog } from "@/app/actions/artisan-dashboard"
 import {
   ClapperboardIcon,
   ImagePlusIcon,
@@ -99,30 +99,55 @@ export default function StoreManageProducts() {
 
   const [loading, setLoading] = useState(true)
   const [products, setProducts] = useState([])
-  const [usingSample, setUsingSample] = useState(false)
+  const [catalogSource, setCatalogSource] = useState("empty")
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState(emptyDraft())
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   const editingProduct = products.find((product) => product.id === editingId) || null
+  const usingSample = false
 
   const fetchProducts = async () => {
-    const storeProducts = listStoreProducts()
-    if (storeProducts.length) {
-      setProducts(storeProducts)
-      setUsingSample(false)
-    } else {
-      setProducts(productDummyData)
-      setUsingSample(true)
+    const cloud = await getArtisanWorkshopCatalog()
+    if (cloud.ok && cloud.products.length) {
+      setProducts(cloud.products)
+      setCatalogSource("supabase")
+      setLoading(false)
+      return
     }
+
+    const storeProducts = listStoreProducts()
+    setProducts(storeProducts)
+    setCatalogSource(storeProducts.length ? "local" : "empty")
     setLoading(false)
   }
 
   const toggleStock = async (productId) => {
-    if (usingSample) {
-      throw new Error("Stock toggle is available after you add your own products.")
+    if (catalogSource === "supabase") {
+      const current = products.find((product) => product.id === productId)
+      if (!current) throw new Error("Product not found.")
+      const nextInStock = !current.inStock
+      const result = await updateMarketplaceProduct({
+        productId,
+        inStock: nextInStock,
+      })
+      if (result.ok === false && result.code === "VALIDATION") {
+        throw new Error(result.error)
+      }
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id === productId
+            ? { ...product, inStock: nextInStock }
+            : product
+        )
+      )
+      if (editingId === productId) {
+        setDraft((prev) => ({ ...prev, inStock: nextInStock }))
+      }
+      return { id: productId, inStock: nextInStock }
     }
+
     const updated = toggleProductStock(productId)
     if (!updated) {
       throw new Error("Stock toggle is available for products you added from this workshop.")
@@ -135,10 +160,6 @@ export default function StoreManageProducts() {
   }
 
   const openEditor = (product) => {
-    if (usingSample) {
-      toast.error("Add your own product first — sample catalog is read-only.")
-      return
-    }
     setEditingId(product.id)
     setDraft(productToDraft(product))
   }
@@ -206,7 +227,7 @@ export default function StoreManageProducts() {
   }
 
   const saveEdits = async () => {
-    if (!editingProduct || usingSample) {
+    if (!editingProduct) {
       throw new Error("Nothing to save.")
     }
 
@@ -256,11 +277,6 @@ export default function StoreManageProducts() {
       regionOrigin: draft.regionOrigin,
     }
 
-    const updated = updateProduct(editingProduct.id, patch)
-    if (!updated) {
-      throw new Error("Could not update this product in your workshop catalog.")
-    }
-
     const cloud = await updateMarketplaceProduct({
       productId: editingProduct.id,
       title: name,
@@ -281,24 +297,39 @@ export default function StoreManageProducts() {
       },
     })
 
-    setProducts(listStoreProducts())
-    setDraft(productToDraft(updated))
+    // Keep a local mirror when this browser has a workshop catalog entry.
+    let updated = null
+    try {
+      updated = updateProduct(editingProduct.id, patch)
+    } catch {
+      updated = null
+    }
 
-    if (cloud.ok === false) {
-      if (
-        cloud.code === "UNAUTHORIZED" ||
-        cloud.code === "SUPABASE_UNAVAILABLE" ||
-        cloud.code === "ARTISAN"
-      ) {
-        return `${formatProductTitle(updated)} saved locally`
-      }
+    if (cloud.ok) {
+      await fetchProducts()
+      setDraft(
+        productToDraft({
+          ...editingProduct,
+          ...patch,
+          images,
+        })
+      )
+      return `${formatProductTitle({ ...editingProduct, ...patch, name })} updated`
+    }
+
+    if (updated) {
+      setProducts(listStoreProducts())
+      setDraft(productToDraft(updated))
       if (cloud.code === "VALIDATION") {
         throw new Error(cloud.error)
       }
-      return `${formatProductTitle(updated)} saved locally (cloud sync pending)`
+      return `${formatProductTitle(updated)} saved locally`
     }
 
-    return `${formatProductTitle(updated)} updated`
+    if (cloud.code === "VALIDATION") {
+      throw new Error(cloud.error)
+    }
+    throw new Error(cloud.error || "Could not update this product.")
   }
 
   useEffect(() => {
@@ -324,11 +355,16 @@ export default function StoreManageProducts() {
         </Link>
       </div>
 
-      {usingSample && (
-        <p className="text-sm text-slate-500 mb-4">
-          Showing sample catalog until you add your first product.
+      {catalogSource === "supabase" ? (
+        <p className="text-xs text-slate-400 mb-4">
+          Showing products from your signed-in Supabase workshop.
         </p>
-      )}
+      ) : null}
+      {catalogSource === "empty" ? (
+        <p className="text-sm text-slate-500 mb-4">
+          No products yet. Add your first piece to start managing the catalog.
+        </p>
+      ) : null}
 
       <table className="w-full max-w-5xl text-left ring ring-slate-200 rounded overflow-hidden text-sm bg-white/70">
         <thead className="bg-slate-50 text-gray-700 uppercase tracking-wider">

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { syncProductMediaBySku } from "@/app/actions/sync-product-media"
+import { getProductImageUrls } from "@/lib/marketplace/media"
 import { listStoreProducts } from "@/lib/productCatalog"
 import { listLiveStores } from "@/lib/storeRegistry"
 import type { StorefrontProduct } from "@/lib/marketplace/types"
@@ -37,20 +38,14 @@ export default function CatalogMediaBridge({
 
       for (const local of localProducts) {
         const sku = String(local.sku || "").trim()
-        const images = Array.isArray(local.images)
-          ? local.images
-              .map((url: string) => String(url || "").trim())
-              .filter(Boolean)
-          : []
+        const images = getProductImageUrls(local)
         if (!sku || !images.length) continue
 
         const server = products.find(
           (item) =>
             String(item.sku || "").trim().toUpperCase() === sku.toUpperCase()
         )
-        const serverImages = Array.isArray(server?.images)
-          ? server.images.filter(Boolean)
-          : []
+        const serverImages = getProductImageUrls(server)
         if (!server || serverImages.length === 0) {
           payload.push({
             sku,

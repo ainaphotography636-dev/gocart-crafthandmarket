@@ -52,3 +52,47 @@ export function resolveMediaUrls(values?: Array<string | null | undefined> | nul
 export function withMediaFallback(url?: string | null) {
   return resolveMediaUrl(url) || MEDIA_PLACEHOLDER
 }
+
+type ProductMediaLike = {
+  images?: Array<string | null | undefined> | null
+  image_urls?: Array<string | null | undefined> | null
+  imageUrls?: Array<string | null | undefined> | null
+  video?: string | null
+  video_proof_url?: string | null
+  item_video_url?: string | null
+  videoProofUrl?: string | null
+}
+
+/**
+ * Collect product photo URLs from either legacy `images` or form/API `image_urls`.
+ */
+export function getProductImageUrls(product?: ProductMediaLike | null): string[] {
+  if (!product) return []
+  const primary = resolveMediaUrls(product.image_urls)
+  if (primary.length) return primary
+  const camel = resolveMediaUrls(product.imageUrls)
+  if (camel.length) return camel
+  return resolveMediaUrls(product.images)
+}
+
+/**
+ * First usable product thumbnail, or null when none are stored.
+ * Pair with SafeImage / withMediaFallback for the placeholder graphic.
+ */
+export function getProductThumbnailUrl(
+  product?: ProductMediaLike | null,
+  fallback: string | null = null
+): string | null {
+  const urls = getProductImageUrls(product)
+  return urls[0] || resolveMediaUrl(fallback) || null
+}
+
+export function getProductVideoUrl(product?: ProductMediaLike | null): string | null {
+  if (!product) return null
+  return (
+    resolveMediaUrl(product.item_video_url) ||
+    resolveMediaUrl(product.video_proof_url) ||
+    resolveMediaUrl(product.videoProofUrl) ||
+    resolveMediaUrl(product.video)
+  )
+}

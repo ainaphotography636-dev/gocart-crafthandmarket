@@ -481,7 +481,9 @@ export async function createMarketplaceProduct(
     // working when Step 1 (ADD VALUE 'INR') has not been run yet.
     currency_default: "USD",
     images: parsed.images,
+    image_urls: parsed.images,
     video_proof_url: parsed.videoProofUrl,
+    item_video_url: parsed.videoProofUrl,
     in_stock: inStock,
     is_published: canPublish,
   }
@@ -744,9 +746,13 @@ export async function updateMarketplaceProduct(input: {
     patch.mrp_inr = mrpInr
     patch.mrp_usd = mrpInr
   }
-  if (images) patch.images = images
+  if (images) {
+    patch.images = images
+    patch.image_urls = images
+  }
   if (Object.prototype.hasOwnProperty.call(input, "videoProofUrl")) {
     patch.video_proof_url = input.videoProofUrl || null
+    patch.item_video_url = input.videoProofUrl || null
   }
   if (input.inStock !== undefined) patch.in_stock = Boolean(input.inStock)
   if (stockQuantity !== null) {

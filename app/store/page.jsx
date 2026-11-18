@@ -5,6 +5,7 @@ import { useCurrency } from "@/components/shared/CurrencyProvider"
 import { getActiveStore } from "@/lib/storeRegistry"
 import { getStoreDashboardStats } from "@/lib/productCatalog"
 import { formatProductTitle } from "@/lib/productCodes"
+import { getProductThumbnailUrl } from "@/lib/marketplace/media"
 import {
   CircleDollarSignIcon,
   ClapperboardIcon,
@@ -171,9 +172,9 @@ export default function Dashboard() {
                 className="border border-slate-200 bg-white/80 rounded-xl overflow-hidden"
               >
                 <div className="relative aspect-[4/3] bg-slate-100">
-                  {product.images?.[0] ? (
+                  {getProductThumbnailUrl(product) ? (
                     <Image
-                      src={product.images[0]}
+                      src={getProductThumbnailUrl(product)}
                       alt={product.name}
                       fill
                       className="object-cover"

@@ -7,8 +7,10 @@ import FeaturedArtisans from '@/components/public/FeaturedArtisans'
 import { listStoreProducts } from '@/lib/productCatalog'
 import { listLiveStores } from '@/lib/storeRegistry'
 import { syncProductMediaBySku } from '@/app/actions/sync-product-media'
+import { getProductImageUrls, getProductThumbnailUrl } from '@/lib/marketplace/media'
 
 function mapLocalProduct(product) {
+  const images = getProductImageUrls(product)
   return {
     id: product.id,
     name: product.name,
@@ -29,7 +31,8 @@ function mapLocalProduct(product) {
     price: Number(product.price) || 0,
     mrp: Number(product.mrp) || Number(product.price) || 0,
     currencyDefault: product.currency || 'INR',
-    images: Array.isArray(product.images) ? product.images.filter(Boolean) : [],
+    images,
+    image_urls: images,
     video: product.video || null,
     inStock: Boolean(product.inStock),
     isPublished: Boolean(product.isPublished ?? true),
@@ -112,12 +115,8 @@ export default function HomeCatalogClient({
       const key = skuKey(product.sku)
       const local = key ? bySku.get(key) : null
       const override = key ? mediaOverrides[key] : null
-      const serverImages = Array.isArray(product.images)
-        ? product.images.filter(Boolean)
-        : []
-      const localImages = Array.isArray(local?.images)
-        ? local.images.filter(Boolean)
-        : []
+      const serverImages = getProductImageUrls(product)
+      const localImages = getProductImageUrls(local)
       const images =
         (override?.images?.length ? override.images : null) ||
         (serverImages.length ? serverImages : null) ||
@@ -126,6 +125,7 @@ export default function HomeCatalogClient({
       return {
         ...product,
         images,
+        image_urls: images,
         video: product.video || override?.video || local?.video || null,
         material: product.material || local?.material || null,
         dimensions: product.dimensions || local?.dimensions || null,
@@ -147,12 +147,13 @@ export default function HomeCatalogClient({
         artisan.logo ||
         local?.logoUrl ||
         local?.logo ||
-        displayProducts.find(
-          (product) =>
-            String(product.artisanUsername || product.storeUsername || '')
-              .toLowerCase() === String(artisan.username || '').toLowerCase() &&
-            product.images?.[0]
-        )?.images?.[0] ||
+        getProductThumbnailUrl(
+          displayProducts.find(
+            (product) =>
+              String(product.artisanUsername || product.storeUsername || '')
+                .toLowerCase() === String(artisan.username || '').toLowerCase()
+          )
+        ) ||
         null
 
       return {
@@ -174,9 +175,7 @@ export default function HomeCatalogClient({
       const server = products.find(
         (item) => skuKey(item.sku) === skuKey(local.sku)
       )
-      const serverImages = Array.isArray(server?.images)
-        ? server.images.filter(Boolean)
-        : []
+      const serverImages = getProductImageUrls(server)
       if (!server || serverImages.length === 0) {
         payload.push({
           sku: local.sku,
@@ -198,12 +197,13 @@ export default function HomeCatalogClient({
     // Also push first product photo as workshop logo when store has none.
     for (const artisan of artisans) {
       if (artisan.logoUrl || artisan.logo) continue
-      const photo = displayProducts.find(
-        (product) =>
-          String(product.artisanUsername || product.storeUsername || '')
-            .toLowerCase() === String(artisan.username || '').toLowerCase() &&
-          product.images?.[0]
-      )?.images?.[0]
+      const photo = getProductThumbnailUrl(
+        displayProducts.find(
+          (product) =>
+            String(product.artisanUsername || product.storeUsername || '')
+              .toLowerCase() === String(artisan.username || '').toLowerCase()
+        )
+      )
       if (photo && artisan.username) {
         payload.push({ username: artisan.username, logoUrl: photo })
       }

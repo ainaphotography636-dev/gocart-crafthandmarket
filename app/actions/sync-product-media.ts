@@ -45,26 +45,65 @@ export async function syncProductMediaBySku(
     const username = row.username ? String(row.username).trim().toLowerCase() : ""
 
     if (sku && images.length) {
-      const { data: existing } = await supabase
+      let { data: existing, error: lookupError } = await supabase
         .from("products")
-        .select("id, images, video_proof_url")
+        .select("id, images, image_urls, video_proof_url, item_video_url")
         .eq("sku", sku)
         .maybeSingle()
 
+      if (lookupError && /column .* does not exist/i.test(lookupError.message)) {
+        const retry = await supabase
+          .from("products")
+          .select("id, images, video_proof_url")
+          .eq("sku", sku)
+          .maybeSingle()
+        existing = retry.data
+          ? {
+              ...retry.data,
+              image_urls: null,
+              item_video_url: null,
+            }
+          : null
+      }
+
       if (existing?.id) {
-        const currentImages = Array.isArray(existing.images) ? existing.images : []
+        const currentImages = [
+          ...(Array.isArray(existing.images) ? existing.images : []),
+          ...(Array.isArray(existing.image_urls) ? existing.image_urls : []),
+        ].filter(Boolean)
         const needsImages = currentImages.length === 0
-        const needsVideo = !existing.video_proof_url && Boolean(video)
+        const needsVideo =
+          !existing.video_proof_url &&
+          !existing.item_video_url &&
+          Boolean(video)
         if (needsImages || needsVideo) {
           const patch: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
           }
-          if (needsImages) patch.images = images
-          if (needsVideo) patch.video_proof_url = video
-          const { error } = await supabase
+          if (needsImages) {
+            patch.images = images
+            patch.image_urls = images
+          }
+          if (needsVideo) {
+            patch.video_proof_url = video
+            patch.item_video_url = video
+          }
+          let { error } = await supabase
             .from("products")
             .update(patch)
             .eq("id", existing.id)
+          if (error && /column .* does not exist/i.test(error.message)) {
+            const compatPatch: Record<string, unknown> = {
+              updated_at: patch.updated_at,
+            }
+            if (needsImages) compatPatch.images = images
+            if (needsVideo) compatPatch.video_proof_url = video
+            const retry = await supabase
+              .from("products")
+              .update(compatPatch)
+              .eq("id", existing.id)
+            error = retry.error
+          }
           if (!error) {
             updated += 1
             revalidatePath("/")

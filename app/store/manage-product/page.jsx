@@ -24,6 +24,7 @@ import {
 import { formatProductTitle } from "@/lib/productCodes"
 import { updateMarketplaceProduct } from "@/app/actions/marketplace-products"
 import { getActiveStore } from "@/lib/storeRegistry"
+import { getProductImageUrls, getProductThumbnailUrl } from "@/lib/marketplace/media"
 
 const MAX_PHOTOS = 6
 const IMAGE_ACCEPT =
@@ -63,8 +64,8 @@ function productToDraft(product) {
     craftTechnique: product.craftTechnique || "",
     dimensions: product.dimensions || "",
     regionOrigin: product.regionOrigin || "",
-    images: Array.isArray(product.images) ? [...product.images] : [],
-    video: product.video || null,
+    images: getProductImageUrls(product),
+    video: product.video || product.item_video_url || null,
     inStock: Boolean(product.inStock),
   }
 }
@@ -355,7 +356,7 @@ export default function StoreManageProducts() {
                     width={40}
                     height={40}
                     className="p-1 shadow rounded cursor-pointer object-cover"
-                    src={product.images?.[0] || "/upload_area.png"}
+                    src={getProductThumbnailUrl(product) || "/upload_area.png"}
                     alt=""
                   />
                   <div>
@@ -375,7 +376,7 @@ export default function StoreManageProducts() {
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2 text-xs">
-                  <span>{product.images?.length || 0} img</span>
+                  <span>{getProductImageUrls(product).length} img</span>
                   {product.video ? (
                     <span className="inline-flex items-center gap-1 text-brand-emerald">
                       <ClapperboardIcon size={14} /> video

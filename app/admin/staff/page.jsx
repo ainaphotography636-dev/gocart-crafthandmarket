@@ -198,13 +198,18 @@ export default function AdminStaffPage() {
 
       if (
         result.code === "DB_UNAVAILABLE" ||
-        result.code === "SUPABASE_UNAVAILABLE"
+        result.code === "SUPABASE_UNAVAILABLE" ||
+        /portfolio|schema cache|admin_role|migration/i.test(result.error || "")
       ) {
         const updated = updateStaffProfileLocal(profileMember.id, profileDraft)
         setStaff(listStaffMembers())
         setSource("local")
         setProfileId(null)
-        toast.success("Profile saved locally")
+        toast.success(
+          /portfolio|schema cache|admin_role/i.test(result.error || "")
+            ? "Saved locally — run 20261118_staff_admin_profiles.sql in Supabase to persist portfolio"
+            : "Profile saved locally"
+        )
         return updated
       }
 

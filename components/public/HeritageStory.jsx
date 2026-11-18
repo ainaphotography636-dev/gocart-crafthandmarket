@@ -21,7 +21,7 @@ export default function HeritageStory() {
           <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
             Our Purpose
           </p>
-          <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl leading-tight text-brand-forest sm:text-4xl">
+          <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl leading-tight text-brand-slate sm:text-4xl">
             Bridging Rural Heritage Workshops and Global Buyers
           </h2>
           <p className="mt-5 text-sm leading-relaxed text-slate-600 sm:text-base">
@@ -34,7 +34,7 @@ export default function HeritageStory() {
             tracked from doorstep pickup to delivery — protecting both artisan and buyer.
           </p>
 
-          <blockquote className="mt-8 border-l-2 border-brand-terracotta bg-[#efe8df] px-5 py-4 text-sm leading-relaxed text-brand-forest">
+          <blockquote className="mt-8 border-l-2 border-brand-terracotta bg-[#efe8df] px-5 py-4 text-sm leading-relaxed text-brand-slate">
             “When a buyer receives video-verified craft with direct workshop pricing,
             heritage traditions stay solvent — and collectors receive the real piece,
             not a factory copy.”

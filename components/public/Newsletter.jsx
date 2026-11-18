@@ -7,7 +7,7 @@ const Newsletter = () => {
         <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
           Studio Notes
         </p>
-        <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl text-brand-forest">
+        <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl text-brand-slate">
           Join the Workshop Letter
         </h2>
         <p className="mt-3 text-sm text-slate-600">

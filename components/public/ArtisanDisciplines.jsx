@@ -35,7 +35,7 @@ export default function ArtisanDisciplines() {
           <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
             Artisan Disciplines
           </p>
-          <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl text-brand-forest sm:text-4xl">
+          <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl text-brand-slate sm:text-4xl">
             Textiles, Metalwork, Ceramics &amp; Woodworking
           </h2>
           <p className="mt-3 text-sm text-slate-600">

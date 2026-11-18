@@ -32,7 +32,7 @@ const Hero = () => {
           <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
             Connecting Rural Artisan Marketplace
           </p>
-          <h1 className="mt-4 font-[family-name:var(--font-display)] text-4xl leading-[1.1] text-brand-forest sm:text-5xl lg:text-[3.35rem]">
+          <h1 className="mt-4 font-[family-name:var(--font-display)] text-4xl leading-[1.1] text-brand-slate sm:text-5xl lg:text-[3.35rem]">
             Direct from Verified Artisans to the World.
           </h1>
           <p className="mt-5 max-w-lg text-sm leading-relaxed text-slate-600 sm:text-base">
@@ -72,7 +72,7 @@ const Hero = () => {
             ready ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
           }`}
         >
-          <div className="relative aspect-[5/4] overflow-hidden bg-brand-forest/5 shadow-[0_24px_60px_-28px_rgba(26,51,46,0.45)]">
+          <div className="relative aspect-[5/4] overflow-hidden bg-brand-forest/5 shadow-[0_24px_60px_-28px_rgba(15,118,110,0.35)]">
             <Image
               src={assets.hero_product_img1}
               alt="Curated Indian handicrafts from verified workshops"

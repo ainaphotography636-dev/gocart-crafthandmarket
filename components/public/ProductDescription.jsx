@@ -53,7 +53,7 @@ const ProductDescription = ({ product }) => {
                                     <dt className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
                                         {row.label}
                                     </dt>
-                                    <dd className="mt-1 font-medium text-brand-forest">{row.value}</dd>
+                                    <dd className="mt-1 font-medium text-brand-slate">{row.value}</dd>
                                 </div>
                             ))}
                         </dl>
@@ -79,7 +79,7 @@ const ProductDescription = ({ product }) => {
                             <div>
                                 <div className="flex items-center">
                                     {Array(5).fill('').map((_, starIndex) => (
-                                        <StarIcon key={starIndex} size={18} className='mt-0.5 text-transparent' fill={item.rating >= starIndex + 1 ? "#c45a30" : "#D1D5DB"} />
+                                        <StarIcon key={starIndex} size={18} className='mt-0.5 text-transparent' fill={item.rating >= starIndex + 1 ? "#c85a32" : "#D1D5DB"} />
                                     ))}
                                 </div>
                                 <p className="my-4 max-w-lg text-sm">{item.review}</p>

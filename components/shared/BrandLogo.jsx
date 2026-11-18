@@ -14,18 +14,21 @@ const badgeLabels = {
 }
 
 /**
- * CraftHand Market brand mark — shared across public, store, and admin shells.
+ * CraftHand Market brand mark — colors sampled from the logo:
+ * Craft #C85A32 · Hand #1E293B · Market #0F766E
  */
 export default function BrandLogo({ href = '/', badge, className = '' }) {
   return (
     <Link
       href={href}
       aria-label="CraftHand Market home"
-      className={`relative inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-xl tracking-tight text-brand-forest sm:text-2xl ${className}`}
+      className={`relative inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-xl tracking-tight sm:text-2xl ${className}`}
     >
       <span className="leading-none">
-        CraftHand Market
-        <span className="text-brand-terracotta">.</span>
+        <span className="text-brand-terracotta">Craft</span>
+        <span className="text-brand-slate">Hand</span>
+        {' '}
+        <span className="text-brand-forest">Market</span>
       </span>
       {badge ? (
         <span

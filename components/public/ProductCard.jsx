@@ -52,7 +52,7 @@ const ProductCard = ({ product }) => {
       </Link>
 
       <div className="flex flex-1 flex-col px-1 pt-4 pb-1">
-        <h3 className="font-[family-name:var(--font-display)] text-lg leading-snug text-brand-forest line-clamp-2 sm:text-xl">
+        <h3 className="font-[family-name:var(--font-display)] text-lg leading-snug text-brand-slate line-clamp-2 sm:text-xl">
           <Link href={`/product/${product.id}`} className="hover:text-brand-terracotta transition">
             {title}
           </Link>
@@ -80,19 +80,19 @@ const ProductCard = ({ product }) => {
         <dl className="mt-4 grid grid-cols-2 border border-brand-forest/10 text-[11px]">
           <div className="border-b border-r border-brand-forest/10 px-2.5 py-2">
             <dt className="uppercase tracking-[0.12em] text-slate-400">Origin</dt>
-            <dd className="mt-0.5 truncate font-medium text-brand-forest">{origin}</dd>
+            <dd className="mt-0.5 truncate font-medium text-brand-slate">{origin}</dd>
           </div>
           <div className="border-b border-brand-forest/10 px-2.5 py-2">
             <dt className="uppercase tracking-[0.12em] text-slate-400">Dimensions</dt>
-            <dd className="mt-0.5 truncate font-medium text-brand-forest">{dimensions}</dd>
+            <dd className="mt-0.5 truncate font-medium text-brand-slate">{dimensions}</dd>
           </div>
           <div className="border-r border-brand-forest/10 px-2.5 py-2">
             <dt className="uppercase tracking-[0.12em] text-slate-400">Weight</dt>
-            <dd className="mt-0.5 truncate font-medium text-brand-forest">{weight}</dd>
+            <dd className="mt-0.5 truncate font-medium text-brand-slate">{weight}</dd>
           </div>
           <div className="px-2.5 py-2">
             <dt className="uppercase tracking-[0.12em] text-slate-400">Verification</dt>
-            <dd className="mt-0.5 truncate font-medium text-brand-forest">
+            <dd className="mt-0.5 truncate font-medium text-brand-slate">
               {hasVideo ? 'Video Confirmed' : 'Workshop Coded'}
             </dd>
           </div>

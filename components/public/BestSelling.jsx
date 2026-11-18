@@ -35,7 +35,7 @@ export default function BestSelling({ products: productsProp }) {
           <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
             Collector Favorites
           </p>
-          <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl text-brand-forest sm:text-3xl">
+          <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl text-brand-slate sm:text-3xl">
             Best Selling
           </h2>
         </div>

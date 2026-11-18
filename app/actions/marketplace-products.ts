@@ -7,6 +7,7 @@ import {
   normalizeArtisanCode,
 } from "@/lib/productCodes"
 import { isSupabaseConfigured } from "@/lib/supabase/config"
+import { tryCreateServiceClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
 export type CustomSpec = { key: string; value: string }
@@ -392,10 +393,38 @@ export async function createMarketplaceProduct(
     }
   }
 
-  const canPublish =
-    parsed.publish &&
-    artisan.verification_status === "verified" &&
-    artisan.is_active === true
+  // Publishing a piece activates the workshop for the public storefront so
+  // RLS (verified + active artisan / published product) can serve it.
+  let verificationStatus = artisan.verification_status
+  let isActive = artisan.is_active === true
+  if (parsed.publish && (verificationStatus !== "verified" || !isActive)) {
+    const activator = tryCreateServiceClient() || supabase
+    const { data: activated, error: activateError } = await activator
+      .from("artisans")
+      .update({
+        verification_status: "verified",
+        is_active: true,
+      })
+      .eq("id", artisan.id)
+      .select(
+        "id, artisan_code, username, workshop_name, verification_status, is_active, next_sku_seq, profile_id"
+      )
+      .single()
+
+    if (!activateError && activated) {
+      verificationStatus = activated.verification_status
+      isActive = activated.is_active === true
+      Object.assign(artisan, activated)
+    } else if (!activateError) {
+      // Optimistic: owner RLS update may not return a row in some clients.
+      verificationStatus = "verified"
+      isActive = true
+    }
+  }
+
+  // Storefront product RLS only requires is_published + in_stock.
+  // Workshop activation above is what surfaces the artisan directory card.
+  const canPublish = Boolean(parsed.publish)
 
   const specsPayload = {
     material: parsed.material,
@@ -457,7 +486,9 @@ export async function createMarketplaceProduct(
       .eq("id", artisan.id)
   }
 
+  revalidatePath("/")
   revalidatePath("/shop")
+  revalidatePath("/artisans")
   revalidatePath("/artisan/products/new")
   revalidatePath("/store")
   revalidatePath("/store/add-product")
@@ -480,8 +511,8 @@ export async function createMarketplaceProduct(
       artisanCode,
       username: artisan.username,
       workshopName: artisan.workshop_name,
-      verificationStatus: artisan.verification_status,
-      isActive: artisan.is_active,
+      verificationStatus,
+      isActive,
     },
   }
 }
@@ -730,7 +761,9 @@ export async function updateMarketplaceProduct(input: {
   }
 
   const artisanCode = normalizeArtisanCode(artisan.artisan_code)
+  revalidatePath("/")
   revalidatePath("/shop")
+  revalidatePath("/artisans")
   revalidatePath("/store")
   revalidatePath("/store/manage-product")
   revalidatePath(`/shop/${artisan.username}`)

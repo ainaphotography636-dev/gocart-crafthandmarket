@@ -612,17 +612,17 @@ export default function ProductUploadForm({
 
       if (publish && !persisted.product.isPublished) {
         toast.success(
-          `${formatProductTitle(product)} saved as draft — workshop must be verified before public listing`
+          `${formatProductTitle(product)} saved as draft — add 4 photos and publish again to list publicly`
         )
       } else {
         toast.success(
           publish
-            ? `${formatProductTitle(product)} published — media on Cloudflare R2`
+            ? `${formatProductTitle(product)} published to the storefront`
             : `${formatProductTitle(product)} saved as draft`
         )
       }
       resetForm(persisted.product.artisanCode)
-      router.push("/store")
+      router.push(publish ? "/" : "/store")
       router.refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save product")

@@ -129,6 +129,9 @@ export default function HomeCatalogClient({
         video: product.video || override?.video || local?.video || null,
         material: product.material || local?.material || null,
         dimensions: product.dimensions || local?.dimensions || null,
+        weight: product.weight || local?.weight || null,
+        regionOrigin:
+          product.regionOrigin || local?.regionOrigin || null,
         craftTechnique: product.craftTechnique || local?.craftTechnique || null,
       }
     })

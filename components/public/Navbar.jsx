@@ -8,11 +8,10 @@ import BrandLogo from "@/components/shared/BrandLogo";
 import CurrencySwitcher from "@/components/shared/CurrencySwitcher";
 
 const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/shop", label: "Shop" },
+    { href: "/shop", label: "Marketplace" },
     { href: "/artisans", label: "Artisans" },
-    { href: "/artisan/join", label: "Become an Artisan" },
-    { href: "/pricing", label: "Pricing" },
+    { href: "/#guarantees", label: "Guarantees" },
+    { href: "/#crafts", label: "Crafts" },
 ]
 
 /**
@@ -87,8 +86,14 @@ const Navbar = () => {
                         </button>
 
                         <Link
+                            href="/artisan/join"
+                            className="bg-brand-terracotta px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-amber-light"
+                        >
+                            Join as Artisan
+                        </Link>
+                        <Link
                             href="/auth/login"
-                            className="px-8 py-2 bg-brand-emerald hover:bg-brand-amber transition text-white rounded-full"
+                            className="border border-brand-forest/20 px-5 py-2.5 text-sm font-medium text-brand-forest transition hover:border-brand-forest"
                         >
                             Login
                         </Link>

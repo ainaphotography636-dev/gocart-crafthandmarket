@@ -1,7 +1,9 @@
 import Hero from "@/components/public/Hero"
-import CategoriesMarquee from "@/components/public/CategoriesMarquee"
 import Newsletter from "@/components/public/Newsletter"
-import OurSpecs from "@/components/public/OurSpec"
+import GuaranteeStrip from "@/components/public/GuaranteeStrip"
+import HeritageStory from "@/components/public/HeritageStory"
+import ArtisanDisciplines from "@/components/public/ArtisanDisciplines"
+import LogisticsBand from "@/components/public/LogisticsBand"
 import HomeCatalogClient from "@/components/public/HomeCatalogClient"
 import CatalogHydrator from "@/components/marketplace/CatalogHydrator"
 import CatalogMediaBridge from "@/components/marketplace/CatalogMediaBridge"
@@ -25,8 +27,10 @@ export default async function Home() {
       <CatalogMediaBridge products={recent.items} />
       <Hero />
       <HomeCatalogClient products={recent.items} artisans={artisans.items} />
-      <CategoriesMarquee />
-      <OurSpecs />
+      <GuaranteeStrip />
+      <HeritageStory />
+      <LogisticsBand />
+      <ArtisanDisciplines />
       <Newsletter />
     </div>
   )

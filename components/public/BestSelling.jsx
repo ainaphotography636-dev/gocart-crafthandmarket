@@ -1,11 +1,11 @@
 'use client'
 
-import Title from './Title'
 import ProductCard from './ProductCard'
 import { useSelector } from 'react-redux'
+import Link from 'next/link'
 
 export default function BestSelling({ products: productsProp }) {
-  const displayQuantity = 8
+  const displayQuantity = 4
   const reduxProducts = useSelector((state) => state.product.list)
   const products = Array.isArray(productsProp) && productsProp.length
     ? productsProp
@@ -25,31 +25,29 @@ export default function BestSelling({ products: productsProp }) {
     })
     .slice(0, displayQuantity)
 
-  const shown = ranked.length
+  // Avoid duplicating the curated grid when the same short list is shown above.
+  if (!ranked.length || products.length <= 8) return null
 
   return (
-    <div className="mx-auto my-30 max-w-6xl px-6">
-      <Title
-        title="Best Selling"
-        description={
-          shown
-            ? `Showing ${shown} of ${products.length} products`
-            : 'Published workshop pieces will appear here'
-        }
-        href="/shop"
-        visibleButton={shown > 0}
-      />
-      {shown ? (
-        <div className="mt-12 grid grid-cols-2 gap-6 sm:flex sm:flex-wrap xl:gap-12">
-          {ranked.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+    <section className="mx-auto max-w-7xl px-6 pb-8 sm:px-8">
+      <div className="flex items-end justify-between gap-4 border-t border-brand-forest/10 pt-12">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
+            Collector Favorites
+          </p>
+          <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl text-brand-forest sm:text-3xl">
+            Best Selling
+          </h2>
         </div>
-      ) : (
-        <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center text-sm text-slate-600">
-          No storefront products yet. Publish from Add Product while signed in.
-        </div>
-      )}
-    </div>
+        <Link href="/shop" className="text-sm text-brand-terracotta hover:underline">
+          Shop all
+        </Link>
+      </div>
+      <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+        {ranked.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+    </section>
   )
 }

@@ -1,4 +1,5 @@
 import localFont from "next/font/local";
+import { Playfair_Display } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import StoreProvider from "@/app/StoreProvider";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -12,15 +13,22 @@ const outfit = localFont({
   display: "swap",
 });
 
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
 export const metadata = {
-  title: "Crafthand Market — Artisan goods, thoughtfully curated",
-  description: "Crafthand Market — Discover premium artisan goods from independent makers.",
+  title: "CraftHand Market — Direct from Verified Artisans",
+  description:
+    "CraftHand Market — authenticated Indian handicrafts with video proof, escrow protection, and workshop-coded pieces.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${outfit.className} antialiased`}>
+      <body className={`${outfit.className} ${playfair.variable} antialiased`}>
         <StoreProvider>
           <CurrencyProvider>
             <AuthProvider>

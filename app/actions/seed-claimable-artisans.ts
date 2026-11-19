@@ -5,6 +5,7 @@ import {
   type ClaimableArtisanSeed,
   type ClaimableProductSeed,
 } from "@/lib/claimableArtisanSeed"
+import { stripSkuTitlePrefix } from "@/lib/productCodes"
 import { tryCreateServiceClient } from "@/utils/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -72,13 +73,13 @@ async function ensureArtisanRow(
   supabase: SupabaseClient,
   profileId: string,
   entry: ClaimableArtisanSeed
-): Promise<{ id: string } | { error: string }> {
+): Promise<{ id: string; artisanCode: string } | { error: string }> {
   const logo = entry.logoUrl || entry.product?.images?.[0] || null
+  // artisan_code is DB-owned (trigger). Never send client codes on insert/update.
   const payload = {
     profile_id: profileId,
     workshop_name: entry.workshopName,
     username: entry.username,
-    artisan_code: entry.artisanCode,
     description: entry.description,
     address: entry.address,
     region: entry.region,
@@ -91,7 +92,7 @@ async function ensureArtisanRow(
 
   const { data: byProfile } = await supabase
     .from("artisans")
-    .select("id")
+    .select("id, artisan_code")
     .eq("profile_id", profileId)
     .maybeSingle()
 
@@ -100,17 +101,17 @@ async function ensureArtisanRow(
       .from("artisans")
       .update(payload)
       .eq("id", byProfile.id)
-      .select("id")
+      .select("id, artisan_code")
       .single()
     if (error || !data?.id) {
       return { error: error?.message || "Artisan update failed." }
     }
-    return { id: data.id }
+    return { id: data.id, artisanCode: data.artisan_code }
   }
 
   const { data: byUsername } = await supabase
     .from("artisans")
-    .select("id")
+    .select("id, artisan_code")
     .eq("username", entry.username)
     .maybeSingle()
 
@@ -119,7 +120,6 @@ async function ensureArtisanRow(
       .from("artisans")
       .update({
         workshop_name: entry.workshopName,
-        artisan_code: entry.artisanCode,
         description: entry.description,
         address: entry.address,
         region: entry.region,
@@ -130,31 +130,45 @@ async function ensureArtisanRow(
         logo_url: logo,
       })
       .eq("id", byUsername.id)
-      .select("id")
+      .select("id, artisan_code")
       .single()
     if (error || !data?.id) {
       return { error: error?.message || "Artisan username update failed." }
     }
-    return { id: data.id }
+    return { id: data.id, artisanCode: data.artisan_code }
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("artisans")
     .insert(payload)
-    .select("id")
+    .select("id, artisan_code")
     .single()
+
+  // Pre-migration fallback when artisan_code is still NOT NULL without default.
+  if (error && /artisan_code|null value/i.test(error.message || "")) {
+    const retry = await supabase
+      .from("artisans")
+      .insert({ ...payload, artisan_code: entry.artisanCode })
+      .select("id, artisan_code")
+      .single()
+    data = retry.data
+    error = retry.error
+  }
 
   if (error || !data?.id) {
     return { error: error?.message || "Artisan insert failed." }
   }
-  return { id: data.id }
+  return { id: data.id, artisanCode: data.artisan_code }
 }
 
 function productPayload(artisanId: string, product: ClaimableProductSeed) {
   const specs = { ...(product.specs || {}) }
+  const title =
+    stripSkuTitlePrefix(product.title) || String(product.title || "").trim()
+  // sku is DB-owned (trigger). Never send client SKUs on insert/update.
   return {
     artisan_id: artisanId,
-    title: product.title,
+    title,
     description: product.description,
     category: product.category,
     material: product.material,
@@ -165,7 +179,6 @@ function productPayload(artisanId: string, product: ClaimableProductSeed) {
     region_origin: product.regionOrigin,
     care_instructions: product.careInstructions,
     specs,
-    sku: product.sku,
     price_inr: product.priceInr,
     mrp_inr: product.mrpInr,
     price_usd: product.priceUsd,
@@ -188,7 +201,7 @@ async function upsertCompat(
   artisanId: string,
   product: ClaimableProductSeed,
   existingId: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; sku?: string } | { ok: false; error: string }> {
   const full = productPayload(artisanId, product)
   const {
     price_inr: _pi,
@@ -208,13 +221,18 @@ async function upsertCompat(
   } = full
 
   if (existingId) {
-    const retry = await supabase.from("products").update(compat).eq("id", existingId)
-    if (!retry.error) return { ok: true as const }
+    const retry = await supabase
+      .from("products")
+      .update(compat)
+      .eq("id", existingId)
+      .select("sku")
+      .single()
+    if (!retry.error) return { ok: true as const, sku: retry.data?.sku }
     return { ok: false as const, error: retry.error.message }
   }
 
-  const retry = await supabase.from("products").insert(compat)
-  if (!retry.error) return { ok: true as const }
+  const retry = await supabase.from("products").insert(compat).select("sku").single()
+  if (!retry.error) return { ok: true as const, sku: retry.data?.sku }
   return { ok: false as const, error: retry.error.message }
 }
 
@@ -222,28 +240,50 @@ async function upsertProduct(
   supabase: SupabaseClient,
   artisanId: string,
   product: ClaimableProductSeed
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; sku?: string } | { ok: false; error: string }> {
   const full = productPayload(artisanId, product)
+  const cleanTitle = full.title
+
+  // Prefer matching an existing piece for this artisan by title (SKU is DB-owned).
   const { data: existing } = await supabase
     .from("products")
-    .select("id")
-    .eq("sku", product.sku)
+    .select("id, sku")
+    .eq("artisan_id", artisanId)
+    .ilike("title", cleanTitle)
     .maybeSingle()
 
   if (existing?.id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("products")
       .update(full)
       .eq("id", existing.id)
-    if (!error) return { ok: true as const }
+      .select("sku")
+      .single()
+    if (!error) return { ok: true as const, sku: data?.sku || existing.sku }
     if (/column|schema cache|PGRST204/i.test(error.message)) {
       return await upsertCompat(supabase, artisanId, product, existing.id)
     }
     return { ok: false as const, error: error.message }
   }
 
-  const { error } = await supabase.from("products").insert(full)
-  if (!error) return { ok: true as const }
+  let { data, error } = await supabase
+    .from("products")
+    .insert(full)
+    .select("sku")
+    .single()
+
+  // Pre-migration fallback when sku is still NOT NULL without default/trigger.
+  if (error && /sku|null value/i.test(error.message || "")) {
+    const retry = await supabase
+      .from("products")
+      .insert({ ...full, sku: product.sku })
+      .select("sku")
+      .single()
+    data = retry.data
+    error = retry.error
+  }
+
+  if (!error) return { ok: true as const, sku: data?.sku }
   if (/column|schema cache|PGRST204/i.test(error.message)) {
     return await upsertCompat(supabase, artisanId, product, null)
   }
@@ -252,7 +292,7 @@ async function upsertProduct(
 
 /**
  * Idempotently seed ten claimable artisans (and optional luxury products).
- * Safe to call from homepage / admin directory loaders.
+ * Codes/SKUs are assigned by Postgres triggers — never by this seed.
  */
 export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResult> {
   const supabase = tryCreateServiceClient()
@@ -312,17 +352,18 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
         continue
       }
 
+      let sku: string | undefined
       if (entry.product) {
         const productResult = await upsertProduct(
           supabase,
           artisan.id,
           entry.product
         )
-        if ("error" in productResult) {
+        if (productResult.ok === false) {
           results.push({
             key: entry.key,
             email,
-            artisanCode: entry.artisanCode,
+            artisanCode: artisan.artisanCode,
             sku: entry.product.sku,
             ok: false,
             createdUser: resolved.created,
@@ -330,13 +371,14 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
           })
           continue
         }
+        sku = productResult.sku
       }
 
       results.push({
         key: entry.key,
         email,
-        artisanCode: entry.artisanCode,
-        sku: entry.product?.sku,
+        artisanCode: artisan.artisanCode,
+        sku,
         ok: true,
         createdUser: resolved.created,
       })

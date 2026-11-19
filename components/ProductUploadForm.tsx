@@ -31,7 +31,7 @@ import {
   FORM_MAX_VIDEO_BYTES,
   type CompressAndUploadProgress,
 } from "@/lib/compressAndUploadVideo"
-import { claimNextProductSku, getActiveStore } from "@/lib/storeRegistry"
+import { getActiveStore } from "@/lib/storeRegistry"
 import { formatProductTitle } from "@/lib/productCodes"
 
 type UploadedImage = {
@@ -245,12 +245,13 @@ export default function ProductUploadForm({
       )
     }
 
-    const claimed = claimNextProductSku(store.id)
+    // Media folder IDs are draft placeholders — final SKU is DB-assigned on save.
+    const draftProductId = `draft-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`
     const route: RouteIds = {
-      artisanId: claimed.artisanCode,
-      productId: claimed.sku,
+      artisanId: store.artisanCode || store.id,
+      productId: draftProductId,
       storeId: store.id,
-      skuSequence: claimed.skuSequence,
+      skuSequence: null,
     }
     claimedRef.current = route
     setArtisanId(route.artisanId)
@@ -476,30 +477,13 @@ export default function ProductUploadForm({
         )
       }
 
-      let sku = productId
-      let artisanCode = artisanId
-      let skuSequence: number | null = claimedRef.current?.skuSequence ?? null
-
-      if (claimedRef.current) {
-        sku = claimedRef.current.productId
-        artisanCode = claimedRef.current.artisanId
-      } else if (productIdProp && artisanIdProp) {
-        sku = productIdProp
-        artisanCode = artisanIdProp
-      } else {
-        const next = claimNextProductSku(store.id)
-        sku = next.sku
-        artisanCode = next.artisanCode
-        skuSequence = next.skuSequence
-        claimedRef.current = {
-          artisanId: artisanCode,
-          productId: sku,
-          storeId: store.id,
-          skuSequence,
-        }
-        setArtisanId(artisanCode)
-        setProductId(sku)
-      }
+      // Ensure R2 draft folder exists; final SKU comes from Supabase triggers.
+      ensureRouteIds()
+      const artisanCode =
+        claimedRef.current?.artisanId ||
+        artisanIdProp ||
+        store.artisanCode ||
+        artisanId
 
       const title = String(productInfo.name || "").trim()
       const description = String(productInfo.description || "").trim()
@@ -546,7 +530,6 @@ export default function ProductUploadForm({
         image_urls,
         item_video_url,
         isPublished: publish,
-        sku,
         workshopName: store.name,
         username: store.username,
         artisanCode,
@@ -559,8 +542,8 @@ export default function ProductUploadForm({
         storeId: store.id,
         storeUsername: store.username,
         artisanCode: persisted.ok ? persisted.product.artisanCode : artisanCode,
-        sku: persisted.ok ? persisted.product.sku : sku,
-        skuSequence,
+        sku: persisted.ok ? persisted.product.sku : "",
+        skuSequence: null,
         name: title,
         description,
         mrp: actualPrice,

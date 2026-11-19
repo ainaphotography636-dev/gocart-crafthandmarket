@@ -38,7 +38,12 @@ const StoreInfo = ({ store }) => {
       <div className="flex flex-col sm:flex-row gap-3 items-center">
         <h3 className="text-xl font-semibold text-slate-800">{store.name}</h3>
         {store.artisanCode ? (
-          <p className="text-xs font-mono text-brand-emerald mt-1">{store.artisanCode}</p>
+          <span
+            className="inline-flex items-center rounded-md border border-brand-emerald/30 bg-brand-emerald-soft px-2.5 py-1 font-mono text-[11px] font-semibold tracking-wide text-brand-emerald"
+            title="Database-assigned artisan code (read-only)"
+          >
+            {store.artisanCode}
+          </span>
         ) : null}
         <span className="text-sm">@{store.username || "workshop"}</span>
 

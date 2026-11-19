@@ -8,6 +8,11 @@ import {
   type CatalogStatus,
 } from "@/lib/marketplace/featured"
 import { isMissingColumnError } from "@/lib/marketplace/productSelect"
+import {
+  mintProductSku,
+  normalizeArtisanCode,
+  stripSkuTitlePrefix,
+} from "@/lib/productCodes"
 import { tryCreateServiceClient } from "@/utils/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -208,8 +213,12 @@ function buildWritePayload(input: AdminProductInput, existingSpecs?: Record<stri
   const price = Number(input.price) || 0
   const mrp = input.mrp == null ? price : Number(input.mrp) || price
 
+  const cleanTitle =
+    stripSkuTitlePrefix(String(input.title || "").trim()) ||
+    String(input.title || "").trim()
+
   return {
-    title: String(input.title || "").trim(),
+    title: cleanTitle,
     description: String(input.description || "").trim(),
     category: String(input.category || "").trim() || "Handicraft",
     material: String(input.material || input.subCategory || "").trim() || null,
@@ -218,7 +227,6 @@ function buildWritePayload(input: AdminProductInput, existingSpecs?: Record<stri
     dimensions: String(input.dimensions || "").trim() || null,
     weight: String(input.weight || "").trim() || null,
     region_origin: String(input.origin || "").trim() || null,
-    sku: String(input.sku || "").trim().toUpperCase(),
     price_inr: price,
     mrp_inr: mrp,
     price_usd: Math.max(1, Math.round(price / 83)),
@@ -241,10 +249,11 @@ export async function saveAdminProduct(
     return { ok: false, error: "Supabase service role is not configured." }
   }
 
-  const sku = String(input.sku || "").trim().toUpperCase()
-  const title = String(input.title || "").trim()
-  if (!sku || !title) {
-    return { ok: false, error: "SKU and title are required." }
+  const title =
+    stripSkuTitlePrefix(String(input.title || "").trim()) ||
+    String(input.title || "").trim()
+  if (!title) {
+    return { ok: false, error: "Title is required." }
   }
   if (!(Number(input.price) > 0)) {
     return { ok: false, error: "Collector price must be greater than zero." }
@@ -261,16 +270,28 @@ export async function saveAdminProduct(
   }
 
   let artisanId = String(input.artisanId || existing?.artisan_id || "").trim()
+  let artisanCode = ""
+  let nextSkuSeq = 1
   if (!artisanId) {
     const { data: artisan } = await supabase
       .from("artisans")
-      .select("id")
+      .select("id, artisan_code, next_sku_seq")
       .eq("is_active", true)
       .eq("verification_status", "verified")
       .order("artisan_code", { ascending: true })
       .limit(1)
       .maybeSingle()
     artisanId = String(artisan?.id || "")
+    artisanCode = String(artisan?.artisan_code || "")
+    nextSkuSeq = Math.max(1, Number(artisan?.next_sku_seq) || 1)
+  } else {
+    const { data: artisan } = await supabase
+      .from("artisans")
+      .select("id, artisan_code, next_sku_seq")
+      .eq("id", artisanId)
+      .maybeSingle()
+    artisanCode = String(artisan?.artisan_code || "")
+    nextSkuSeq = Math.max(1, Number(artisan?.next_sku_seq) || 1)
   }
   if (!artisanId) {
     return { ok: false, error: "No verified artisan available to own this product." }
@@ -294,6 +315,26 @@ export async function saveAdminProduct(
   }
 
   let result = await write(payload as Record<string, unknown>)
+
+  // Pre-migration fallback: sku still NOT NULL without default/trigger.
+  if (
+    !existing?.id &&
+    result.error &&
+    /sku|null value/i.test(result.error.message || "")
+  ) {
+    const minted = mintProductSku({
+      artisanCode: normalizeArtisanCode(artisanCode || "ART000"),
+      nextSkuSeq,
+    })
+    result = await write({ ...payload, sku: minted.sku })
+    if (!result.error) {
+      await supabase
+        .from("artisans")
+        .update({ next_sku_seq: minted.nextSkuSeq })
+        .eq("id", artisanId)
+    }
+  }
+
   if (result.error && isMissingColumnError(result.error)) {
     const body = { ...(payload as Record<string, unknown>) }
     delete body.is_featured

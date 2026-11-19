@@ -47,6 +47,13 @@ export default function Dashboard() {
     if (cloud.ok) {
       setSource("supabase")
       setAuthHint("")
+      setStore((prev) => ({
+        ...(prev || {}),
+        id: cloud.artisan?.id || prev?.id,
+        name: cloud.artisan?.workshopName || prev?.name || "Workshop",
+        username: cloud.artisan?.username || prev?.username,
+        artisanCode: cloud.artisan?.artisanCode || prev?.artisanCode,
+      }))
       setDashboardData({
         totalProducts: cloud.stats.totalProducts,
         inStock: cloud.stats.inStock,
@@ -127,9 +134,19 @@ export default function Dashboard() {
     <div className="text-slate-500 mb-28">
       <div className="flex flex-col gap-3 max-w-5xl">
         <p className="text-xs uppercase tracking-[0.2em] text-brand-gold">Artisan studio</p>
-        <h1 className="text-3xl text-slate-800 font-medium">
-          {store?.name || "Seller"} dashboard
-        </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl text-slate-800 font-medium">
+            {store?.name || "Seller"} dashboard
+          </h1>
+          {store?.artisanCode ? (
+            <span
+              className="inline-flex items-center rounded-md border border-brand-emerald/30 bg-brand-emerald-soft px-2.5 py-1 font-mono text-xs font-semibold tracking-wide text-brand-emerald"
+              title="Database-assigned artisan code (read-only)"
+            >
+              {store.artisanCode}
+            </span>
+          ) : null}
+        </div>
         <p className="max-w-2xl text-sm leading-6">
           Manage your Kerala workshop listings, upload craft photos and process videos to
           Cloudflare R2, and keep stock ready for Crafthand Market shoppers.

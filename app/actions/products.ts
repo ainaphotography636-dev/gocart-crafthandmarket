@@ -5,8 +5,9 @@ import prisma, { isDatabaseConfigured } from "@/lib/prisma"
 import { mintProductSku, normalizeArtisanCode } from "@/lib/productCodes"
 
 /**
- * Create a product under a store and auto-assign
- * sku = `{artisanCode}-{sequence}` (e.g. ART001-001).
+ * Prisma-path product create with transactional SKU mint.
+ * Prefer Supabase `createMarketplaceProduct` + DB trigger
+ * `generate_unique_product_sku` for the live marketplace.
  */
 export async function createProductWithArtisanSku(input: {
   storeId: string

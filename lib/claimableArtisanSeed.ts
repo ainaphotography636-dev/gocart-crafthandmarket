@@ -3,6 +3,10 @@
  * Auth emails are reserved so a real workshop can later claim the profile
  * (invite / password reset on the same address). Seeded into Supabase as
  * verified + active so they appear on public /artisans and admin directory.
+ *
+ * Note: `artisanCode` / product `sku` values below are documentation hints only.
+ * Production numbering is assigned by Postgres triggers
+ * (`generate_unique_artisan_code` / `generate_unique_product_sku`).
  */
 
 export type ClaimableProductSeed = {

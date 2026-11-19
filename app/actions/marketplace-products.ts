@@ -5,6 +5,7 @@ import {
   allocateArtisanCode,
   mintProductSku,
   normalizeArtisanCode,
+  stripSkuTitlePrefix,
 } from "@/lib/productCodes"
 import {
   isMissingColumnError,
@@ -273,12 +274,6 @@ async function ensureArtisanForUser(
     }
   }
 
-  const { data: codes } = await supabase.from("artisans").select("artisan_code")
-  const artisanCode = normalizeArtisanCode(
-    opts.artisanCode ||
-      allocateArtisanCode((codes || []).map((row) => row.artisan_code))
-  )
-
   const workshopName =
     opts.workshopName ||
     opts.fullName ||
@@ -287,28 +282,51 @@ async function ensureArtisanForUser(
 
   let username = slugifyUsername(opts.username || workshopName)
   if (username.length < 3) {
-    username = `atelier-${artisanCode.toLowerCase().slice(0, 8)}`
+    username = `atelier-${userId.replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase() || "workshop"}`
   }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const candidate =
       attempt === 0 ? username : `${username.slice(0, 36)}-${attempt + 1}`
-    const { data: created, error: createError } = await supabase
+    // Prefer DB trigger generate_unique_artisan_code(); fall back if migration
+    // has not been applied yet (NOT NULL without default).
+    const baseRow = {
+      profile_id: userId,
+      workshop_name: workshopName,
+      username: candidate,
+      description: "",
+      verification_status: "pending" as const,
+      is_active: false,
+      next_sku_seq: 1,
+    }
+
+    let { data: created, error: createError } = await supabase
       .from("artisans")
-      .insert({
-        profile_id: userId,
-        workshop_name: workshopName,
-        username: candidate,
-        artisan_code: artisanCode,
-        description: "",
-        verification_status: "pending",
-        is_active: false,
-        next_sku_seq: 1,
-      })
+      .insert(baseRow)
       .select(
         "id, artisan_code, username, workshop_name, verification_status, is_active, next_sku_seq, profile_id"
       )
       .single()
+
+    if (
+      createError &&
+      /artisan_code|null value/i.test(createError.message || "")
+    ) {
+      const { data: codes } = await supabase.from("artisans").select("artisan_code")
+      const legacyCode = normalizeArtisanCode(
+        opts.artisanCode ||
+          allocateArtisanCode((codes || []).map((row) => row.artisan_code))
+      )
+      const retry = await supabase
+        .from("artisans")
+        .insert({ ...baseRow, artisan_code: legacyCode })
+        .select(
+          "id, artisan_code, username, workshop_name, verification_status, is_active, next_sku_seq, profile_id"
+        )
+        .single()
+      created = retry.data
+      createError = retry.error
+    }
 
     if (!createError && created) {
       return { artisan: created }
@@ -360,7 +378,6 @@ export async function createMarketplaceProduct(
   const ensured = await ensureArtisanForUser(supabase, user.id, {
     workshopName: parsed.workshopName,
     username: parsed.username,
-    artisanCode: parsed.artisanCode,
     email: user.email,
     fullName:
       typeof user.user_metadata?.full_name === "string"
@@ -378,24 +395,7 @@ export async function createMarketplaceProduct(
 
   const artisan = ensured.artisan
   const artisanCode = normalizeArtisanCode(artisan.artisan_code)
-
-  let sku = parsed.sku
-  let nextSkuSeq = Math.max(1, Number(artisan.next_sku_seq) || 1)
-
-  if (!sku) {
-    const minted = mintProductSku({
-      artisanCode,
-      nextSkuSeq,
-    })
-    sku = minted.sku
-    nextSkuSeq = minted.nextSkuSeq
-  } else {
-    const match = sku.match(/-(\d+)$/)
-    const seq = match ? Number(match[1]) : null
-    if (seq && Number.isFinite(seq)) {
-      nextSkuSeq = Math.max(nextSkuSeq, seq + 1)
-    }
-  }
+  const cleanTitle = stripSkuTitlePrefix(parsed.title) || parsed.title
 
   // Publishing a piece activates the workshop for the public storefront so
   // RLS (verified + active artisan / published product) can serve it.
@@ -458,9 +458,11 @@ export async function createMarketplaceProduct(
       ? `${parsed.description}\n\n${extraBits.join(" · ")}`
       : parsed.description
 
-  const fullRow = {
+  // Prefer DB trigger generate_unique_product_sku(); fall back to client mint
+  // only when the numbering migration has not been applied yet.
+  const fullRow: Record<string, unknown> = {
     artisan_id: artisan.id,
-    title: parsed.title,
+    title: cleanTitle,
     description: descriptionWithExtras,
     category: parsed.category,
     material: parsed.material,
@@ -471,7 +473,6 @@ export async function createMarketplaceProduct(
     region_origin: parsed.regionOrigin,
     care_instructions: parsed.careInstructions,
     specs: specsPayload,
-    sku,
     // INR is the marketplace currency; keep price_usd populated for legacy readers.
     price_inr: parsed.priceInr,
     mrp_inr: parsed.mrpInr,
@@ -494,6 +495,27 @@ export async function createMarketplaceProduct(
     .select("id, sku, title, artisan_id, is_published")
     .single()
 
+  if (insertError && /sku|null value/i.test(insertError.message || "")) {
+    const minted = mintProductSku({
+      artisanCode,
+      nextSkuSeq: Math.max(1, Number(artisan.next_sku_seq) || 1),
+    })
+    const legacyRow = { ...fullRow, sku: minted.sku }
+    const retry = await supabase
+      .from("products")
+      .insert(legacyRow)
+      .select("id, sku, title, artisan_id, is_published")
+      .single()
+    product = retry.data
+    insertError = retry.error
+    if (!insertError && product) {
+      await supabase
+        .from("artisans")
+        .update({ next_sku_seq: minted.nextSkuSeq })
+        .eq("id", artisan.id)
+    }
+  }
+
   if (insertError && isMissingColumnError(insertError)) {
     const retry = await supabase
       .from("products")
@@ -510,13 +532,6 @@ export async function createMarketplaceProduct(
       code: "INSERT",
       error: insertError?.message || "Could not save product.",
     }
-  }
-
-  if (nextSkuSeq !== artisan.next_sku_seq) {
-    await supabase
-      .from("artisans")
-      .update({ next_sku_seq: nextSkuSeq })
-      .eq("id", artisan.id)
   }
 
   revalidatePath("/")
@@ -599,10 +614,9 @@ export async function publishHandicraftProduct(
     images: imageUrls,
     videoProofUrl: input.item_video_url || null,
     publish: isPublished,
-    sku: input.sku,
+    // SKU is minted by Postgres trigger — never trust client values.
     workshopName: input.workshopName,
     username: input.username,
-    artisanCode: input.artisanCode,
     specs: {
       material: input.primaryMaterial,
       craftTechnique: input.craftTechnique,

@@ -338,8 +338,19 @@ export default function AdminProductsPage() {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-medium text-slate-600">
+                SKU
+                <input
+                  value={
+                    editing.sku ||
+                    (editing.id ? "" : "Assigned automatically on save")
+                  }
+                  readOnly
+                  className="mt-1 w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-600"
+                  title="Database-assigned product SKU (read-only)"
+                />
+              </label>
               {[
-                ["sku", "SKU"],
                 ["title", "Title"],
                 ["displayName", "Card display name"],
                 ["badgeLeft", "Left badge"],

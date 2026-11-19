@@ -270,7 +270,12 @@ export default function AdminStores() {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-mono text-brand-emerald">{artisan.artisanCode}</p>
+                <span
+                  className="inline-flex items-center rounded-md border border-brand-emerald/30 bg-brand-emerald-soft px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-emerald"
+                  title="Database-assigned artisan code (read-only)"
+                >
+                  {artisan.artisanCode}
+                </span>
                 <h3 className="text-slate-800 font-medium mt-1">{artisan.name}</h3>
                 <p className="text-xs text-slate-400 mt-1">@{artisan.username}</p>
               </div>

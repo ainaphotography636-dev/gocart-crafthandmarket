@@ -2,6 +2,7 @@ import Hero from "@/components/public/Hero"
 import Newsletter from "@/components/public/Newsletter"
 import GuaranteeStrip from "@/components/public/GuaranteeStrip"
 import HeritageStory from "@/components/public/HeritageStory"
+import HeritageCraftPillars from "@/components/public/HeritageCraftPillars"
 import CategoriesMarquee from "@/components/public/CategoriesMarquee"
 import LogisticsBand from "@/components/public/LogisticsBand"
 import HomeCatalogClient from "@/components/public/HomeCatalogClient"
@@ -34,6 +35,7 @@ export default async function Home() {
       <Hero />
       <HomeCatalogClient products={homepageProducts} />
       <CategoriesMarquee />
+      <HeritageCraftPillars />
       <GuaranteeStrip />
       <HeritageStory />
       <LogisticsBand />

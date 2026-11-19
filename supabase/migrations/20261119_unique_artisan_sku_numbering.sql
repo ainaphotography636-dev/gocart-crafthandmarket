@@ -73,9 +73,22 @@ alter table public.artisans
 alter table public.artisans
   alter column artisan_code set not null;
 
+-- UNIQUE may already exist from the base schema. Postgres raises 42P07
+-- (duplicate_table) for the backing index, not only 42710 (duplicate_object).
 do $$ begin
-  alter table public.artisans add constraint artisans_artisan_code_key unique (artisan_code);
-exception when duplicate_object then null;
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.artisans'::regclass
+      and contype = 'u'
+      and pg_get_constraintdef(oid) ilike '%(artisan_code)%'
+  ) then
+    alter table public.artisans
+      add constraint artisans_artisan_code_key unique (artisan_code);
+  end if;
+exception
+  when duplicate_object then null;
+  when duplicate_table then null;
 end $$;
 
 -- -----------------------------------------------------------------------------
@@ -178,8 +191,19 @@ alter table public.products
   alter column sku set not null;
 
 do $$ begin
-  alter table public.products add constraint products_sku_key unique (sku);
-exception when duplicate_object then null;
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.products'::regclass
+      and contype = 'u'
+      and pg_get_constraintdef(oid) ilike '%(sku)%'
+  ) then
+    alter table public.products
+      add constraint products_sku_key unique (sku);
+  end if;
+exception
+  when duplicate_object then null;
+  when duplicate_table then null;
 end $$;
 
 create or replace function public.generate_unique_product_sku()

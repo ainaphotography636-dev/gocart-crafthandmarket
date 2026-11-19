@@ -1,9 +1,23 @@
 import Link from "next/link"
 import ArtisanCard from "@/components/public/ArtisanCard"
 import { listStorefrontArtisans } from "@/lib/marketplace/catalog"
+import { ensureClaimableLuxuryCatalog } from "@/app/actions/seed-claimable-artisans"
+import { CLAIMABLE_ARTISAN_SEED } from "@/lib/claimableArtisanSeed"
+
+const CLAIMABLE_CODES = new Set(
+  CLAIMABLE_ARTISAN_SEED.map((entry) => entry.artisanCode.toUpperCase())
+)
 
 export default async function ArtisansPage() {
-  const { items: artisans, source, error } = await listStorefrontArtisans()
+  await ensureClaimableLuxuryCatalog()
+  const { items, source, error } = await listStorefrontArtisans()
+  const artisans = items.map((artisan) => ({
+    ...artisan,
+    claimable: CLAIMABLE_CODES.has(String(artisan.artisanCode || "").toUpperCase()),
+    source: CLAIMABLE_CODES.has(String(artisan.artisanCode || "").toUpperCase())
+      ? "claimable"
+      : artisan.source || "supabase",
+  }))
 
   return (
     <div className="mx-6 my-12 mx-auto mb-28 max-w-7xl">
@@ -12,9 +26,8 @@ export default async function ArtisansPage() {
         Artisan profiles & stores
       </h1>
       <p className="mt-3 max-w-2xl text-sm text-slate-500">
-        Browse verified Crafthand Market workshops. Logos and product media are
-        served from Cloudflare R2; listings come from the Supabase marketplace
-        catalog.
+        Browse verified CraftHand Market workshops from Supabase. Profiles marked
+        Claimable can later be transferred to the original artisan via reserved email.
       </p>
       <p className="mt-3 text-xs text-slate-400">
         Source: {source}

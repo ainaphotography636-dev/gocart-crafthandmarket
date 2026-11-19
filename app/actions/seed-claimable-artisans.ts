@@ -1,6 +1,10 @@
 "use server"
 
-import { CLAIMABLE_ARTISAN_SEED } from "@/lib/claimableArtisanSeed"
+import {
+  CLAIMABLE_ARTISAN_SEED,
+  type ClaimableArtisanSeed,
+  type ClaimableProductSeed,
+} from "@/lib/claimableArtisanSeed"
 import { tryCreateServiceClient } from "@/utils/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -10,7 +14,8 @@ export type SeedClaimableResult = {
   results: Array<{
     key: string
     email: string
-    sku: string
+    artisanCode: string
+    sku?: string
     ok: boolean
     createdUser?: boolean
     error?: string
@@ -66,8 +71,9 @@ async function resolveOrCreateArtisanUser(
 async function ensureArtisanRow(
   supabase: SupabaseClient,
   profileId: string,
-  entry: (typeof CLAIMABLE_ARTISAN_SEED)[number]
+  entry: ClaimableArtisanSeed
 ): Promise<{ id: string } | { error: string }> {
+  const logo = entry.logoUrl || entry.product?.images?.[0] || null
   const payload = {
     profile_id: profileId,
     workshop_name: entry.workshopName,
@@ -76,10 +82,11 @@ async function ensureArtisanRow(
     description: entry.description,
     address: entry.address,
     region: entry.region,
+    contact_phone: entry.phone,
     gi_tags: [...entry.giTags],
     verification_status: "verified",
     is_active: true,
-    logo_url: entry.product.images[0] || null,
+    logo_url: logo,
   }
 
   const { data: byProfile } = await supabase
@@ -103,7 +110,7 @@ async function ensureArtisanRow(
 
   const { data: byUsername } = await supabase
     .from("artisans")
-    .select("id, profile_id")
+    .select("id")
     .eq("username", entry.username)
     .maybeSingle()
 
@@ -116,10 +123,11 @@ async function ensureArtisanRow(
         description: entry.description,
         address: entry.address,
         region: entry.region,
+        contact_phone: entry.phone,
         gi_tags: [...entry.giTags],
         verification_status: "verified",
         is_active: true,
-        logo_url: entry.product.images[0] || null,
+        logo_url: logo,
       })
       .eq("id", byUsername.id)
       .select("id")
@@ -142,10 +150,7 @@ async function ensureArtisanRow(
   return { id: data.id }
 }
 
-function productPayload(
-  artisanId: string,
-  product: (typeof CLAIMABLE_ARTISAN_SEED)[number]["product"]
-) {
+function productPayload(artisanId: string, product: ClaimableProductSeed) {
   return {
     artisan_id: artisanId,
     title: product.title,
@@ -172,10 +177,41 @@ function productPayload(
   }
 }
 
+async function upsertCompat(
+  supabase: SupabaseClient,
+  artisanId: string,
+  product: ClaimableProductSeed,
+  existingId: string | null
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const full = productPayload(artisanId, product)
+  const {
+    price_inr: _pi,
+    mrp_inr: _mi,
+    image_urls: _iu,
+    weight: _w,
+    region_origin: _ro,
+    care_instructions: _ci,
+    specs: _sp,
+    craft_technique: _ct,
+    dimensions: _d,
+    ...compat
+  } = full
+
+  if (existingId) {
+    const retry = await supabase.from("products").update(compat).eq("id", existingId)
+    if (!retry.error) return { ok: true as const }
+    return { ok: false as const, error: retry.error.message }
+  }
+
+  const retry = await supabase.from("products").insert(compat)
+  if (!retry.error) return { ok: true as const }
+  return { ok: false as const, error: retry.error.message }
+}
+
 async function upsertProduct(
   supabase: SupabaseClient,
   artisanId: string,
-  product: (typeof CLAIMABLE_ARTISAN_SEED)[number]["product"]
+  product: ClaimableProductSeed
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const full = productPayload(artisanId, product)
   const { data: existing } = await supabase
@@ -204,40 +240,9 @@ async function upsertProduct(
   return { ok: false as const, error: error.message }
 }
 
-async function upsertCompat(
-  supabase: SupabaseClient,
-  artisanId: string,
-  product: (typeof CLAIMABLE_ARTISAN_SEED)[number]["product"],
-  existingId: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const full = productPayload(artisanId, product)
-  const {
-    price_inr: _pi,
-    mrp_inr: _mi,
-    image_urls: _iu,
-    weight: _w,
-    region_origin: _ro,
-    care_instructions: _ci,
-    specs: _sp,
-    craft_technique: _ct,
-    dimensions: _d,
-    ...compat
-  } = full
-
-  if (existingId) {
-    const retry = await supabase.from("products").update(compat).eq("id", existingId)
-    if (!retry.error) return { ok: true as const }
-    return { ok: false as const, error: retry.error.message }
-  }
-
-  const retry = await supabase.from("products").insert(compat)
-  if (!retry.error) return { ok: true as const }
-  return { ok: false as const, error: retry.error.message }
-}
-
 /**
- * Idempotently seed three claimable artisans and their Featured Luxury pieces.
- * Safe to call from the homepage.
+ * Idempotently seed ten claimable artisans (and optional luxury products).
+ * Safe to call from homepage / admin directory loaders.
  */
 export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResult> {
   const supabase = tryCreateServiceClient()
@@ -265,7 +270,8 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
         results.push({
           key: entry.key,
           email,
-          sku: entry.product.sku,
+          artisanCode: entry.artisanCode,
+          sku: entry.product?.sku,
           ok: false,
           error: resolved.error,
         })
@@ -287,7 +293,8 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
         results.push({
           key: entry.key,
           email,
-          sku: entry.product.sku,
+          artisanCode: entry.artisanCode,
+          sku: entry.product?.sku,
           ok: false,
           createdUser: resolved.created,
           error: artisan.error,
@@ -295,26 +302,31 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
         continue
       }
 
-      const productResult = await upsertProduct(
-        supabase,
-        artisan.id,
-        entry.product
-      )
-      if ("error" in productResult) {
-        results.push({
-          key: entry.key,
-          email,
-          sku: entry.product.sku,
-          ok: false,
-          createdUser: resolved.created,
-          error: productResult.error,
-        })
-        continue
+      if (entry.product) {
+        const productResult = await upsertProduct(
+          supabase,
+          artisan.id,
+          entry.product
+        )
+        if ("error" in productResult) {
+          results.push({
+            key: entry.key,
+            email,
+            artisanCode: entry.artisanCode,
+            sku: entry.product.sku,
+            ok: false,
+            createdUser: resolved.created,
+            error: productResult.error,
+          })
+          continue
+        }
       }
+
       results.push({
         key: entry.key,
         email,
-        sku: entry.product.sku,
+        artisanCode: entry.artisanCode,
+        sku: entry.product?.sku,
         ok: true,
         createdUser: resolved.created,
       })
@@ -323,7 +335,8 @@ export async function ensureClaimableLuxuryCatalog(): Promise<SeedClaimableResul
       results.push({
         key: entry.key,
         email,
-        sku: entry.product.sku,
+        artisanCode: entry.artisanCode,
+        sku: entry.product?.sku,
         ok: false,
         error: error instanceof Error ? error.message : "Unknown seed error.",
       })

@@ -15,7 +15,8 @@ import { fetchArtisanDirectory, syncArtisanToR2 } from "@/lib/artisanDirectory"
 
 function isApprovedArtisan(artisan) {
   if (!artisan) return false
-  if (artisan.source === "demo") return false
+  // Legacy Happy Shop dummy stays out of Live; claimable Supabase demos are included.
+  if (artisan.source === "demo" && !artisan.claimable) return false
   if (artisan.status && artisan.status !== "approved") return false
   if (artisan.isActive === false) return false
   return true
@@ -149,13 +150,14 @@ export default function AdminStores() {
             Artisan & <span className="text-slate-800 font-medium">Store Management</span>
           </h1>
           <p className="text-sm mt-2 max-w-2xl">
-            Connected profiles from Cloudflare R2 (`artisans/&#123;code&#125;/profile.json`) plus local
-            workshop registrations.
+            Supabase claimable workshops (ART101–ART110) plus Cloudflare R2 profiles and local
+            registrations. Claimable emails can be sent to real artisans later.
           </p>
           <p className="text-xs mt-2">
             Source: {meta.source}
             {meta.r2Configured ? ` · ${meta.r2Count} on R2` : " · R2 not configured"}
             {` · ${liveApproved.length} approved`}
+            {` · ${artisans.filter((a) => a.claimable).length} claimable`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -185,7 +187,8 @@ export default function AdminStores() {
         Live / approved artisan profiles
       </h2>
       <p className="text-xs mt-1 text-slate-400">
-        Local approvals plus R2 profiles marked approved (demo stores excluded).
+        Local approvals, Supabase claimable workshops, and R2 profiles marked approved
+        (legacy Happy Shop demo excluded).
       </p>
       {liveApproved.length ? (
         <div className="flex flex-col gap-4 mt-4">
@@ -198,9 +201,15 @@ export default function AdminStores() {
               >
                 <StoreInfo store={store} />
                 <div className="flex items-center gap-3 pt-2 flex-wrap">
-                  <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
-                    {store.source || (isLocal ? "local" : "directory")}
-                  </span>
+                  {store.claimable ? (
+                    <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-brand-terracotta/15 text-brand-terracotta">
+                      Claimable
+                    </span>
+                  ) : (
+                    <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
+                      {store.source || (isLocal ? "local" : "directory")}
+                    </span>
+                  )}
                   {isLocal ? (
                     <>
                       <p>Active</p>
@@ -266,9 +275,15 @@ export default function AdminStores() {
                 <p className="text-xs text-slate-400 mt-1">@{artisan.username}</p>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
-                  {artisan.source}
-                </span>
+                {artisan.claimable ? (
+                  <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-brand-terracotta/15 text-brand-terracotta">
+                    Claimable
+                  </span>
+                ) : (
+                  <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded bg-slate-100">
+                    {artisan.source}
+                  </span>
+                )}
                 <span className="text-[11px] text-slate-400">
                   {artisan.status || "approved"}
                 </span>

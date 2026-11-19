@@ -20,7 +20,11 @@ export default function ArtisanCard({ artisan }) {
         <span className="absolute left-3 top-3 rounded bg-brand-ink/80 px-2 py-1 text-[11px] uppercase tracking-wide text-white">
           {artisan.artisanCode}
         </span>
-        {artisan.source === "supabase" || artisan.source === "r2" ? (
+        {artisan.claimable || artisan.source === "claimable" ? (
+          <span className="absolute right-3 top-3 rounded bg-brand-terracotta px-2 py-1 text-[11px] uppercase tracking-wide text-white">
+            Claimable
+          </span>
+        ) : artisan.source === "supabase" || artisan.source === "r2" ? (
           <span className="absolute right-3 top-3 rounded bg-brand-emerald px-2 py-1 text-[11px] uppercase tracking-wide text-white">
             {artisan.source === "supabase" ? "Live" : "R2"}
           </span>

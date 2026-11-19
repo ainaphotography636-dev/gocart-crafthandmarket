@@ -7,24 +7,32 @@ import LogisticsBand from "@/components/public/LogisticsBand"
 import HomeCatalogClient from "@/components/public/HomeCatalogClient"
 import CatalogHydrator from "@/components/marketplace/CatalogHydrator"
 import CatalogMediaBridge from "@/components/marketplace/CatalogMediaBridge"
-import { listStorefrontProducts } from "@/lib/marketplace/catalog"
+import {
+  listFeaturedLuxuryProducts,
+  listStorefrontProducts,
+} from "@/lib/marketplace/catalog"
 import { ensureClaimableLuxuryCatalog } from "@/app/actions/seed-claimable-artisans"
 
 export default async function Home() {
-  // Ensure three claimable luxury workshops/products exist for Featured layer.
+  // Ensure claimable workshops/products exist, then load featured + recent.
   await ensureClaimableLuxuryCatalog()
 
-  const recent = await listStorefrontProducts({
-    limit: 8,
-    requireInStock: false,
-  })
+  const [featured, recent] = await Promise.all([
+    listFeaturedLuxuryProducts({ limit: 8 }),
+    listStorefrontProducts({
+      limit: 8,
+      requireInStock: false,
+    }),
+  ])
+
+  const homepageProducts = featured.items.length ? featured.items : recent.items
 
   return (
     <div>
-      <CatalogHydrator products={recent.items} replace />
-      <CatalogMediaBridge products={recent.items} />
+      <CatalogHydrator products={homepageProducts} replace />
+      <CatalogMediaBridge products={homepageProducts} />
       <Hero />
-      <HomeCatalogClient products={recent.items} />
+      <HomeCatalogClient products={homepageProducts} />
       <CategoriesMarquee />
       <GuaranteeStrip />
       <HeritageStory />

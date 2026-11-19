@@ -19,8 +19,45 @@ const ARTISAN_EMBED = `
   )
 `
 
-/** Full schema after 20261117_product_inr_specs.sql */
+/** Full schema after featured luxury + INR specs migrations */
 export const PRODUCT_SELECT_FULL = `
+  id,
+  artisan_id,
+  title,
+  description,
+  category,
+  material,
+  gi_tag,
+  craft_technique,
+  dimensions,
+  weight,
+  region_origin,
+  care_instructions,
+  specs,
+  sku,
+  price_inr,
+  mrp_inr,
+  price_usd,
+  mrp_usd,
+  currency_default,
+  images,
+  image_urls,
+  video_proof_url,
+  item_video_url,
+  in_stock,
+  is_published,
+  is_featured,
+  featured_order,
+  badge_left,
+  badge_right,
+  catalog_status,
+  created_at,
+  updated_at,
+  ${ARTISAN_EMBED}
+`
+
+/** Specs-era schema before featured columns exist */
+export const PRODUCT_SELECT_SPECS = `
   id,
   artisan_id,
   title,
@@ -90,6 +127,12 @@ export function toCompatProductRow<T extends Record<string, unknown>>(row: T) {
     mrp_inr: _mi,
     image_urls: _iu,
     item_video_url: _iv,
+    is_featured: _f,
+    featured_order: _fo,
+    badge_left: _bl,
+    badge_right: _br,
+    catalog_status: _cs,
+    updated_at: _ua,
     ...compat
   } = row
   return compat

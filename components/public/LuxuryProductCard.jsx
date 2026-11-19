@@ -26,6 +26,7 @@ function meta(value, fallback = '—') {
 }
 
 function stockBadge(product) {
+  if (product?.badgeRight) return String(product.badgeRight)
   if (product?.specs?.series) return String(product.specs.series)
   const qty = Number(product?.specs?.stockQuantity)
   if (Number.isFinite(qty) && qty > 0 && qty <= 3) return 'Limited Series'
@@ -35,6 +36,7 @@ function stockBadge(product) {
 }
 
 function accentBadge(product) {
+  if (product?.badgeLeft) return String(product.badgeLeft)
   if (product?.specs?.badge) return String(product.specs.badge)
   if (product?.giTag) {
     const tag = String(product.giTag)
@@ -70,13 +72,17 @@ export default function LuxuryProductCard({ product }) {
   const image = getProductThumbnailUrl(product)
   const title = formatProductTitle(product)
   const displayName = String(
-    product?.specs?.displayName ||
+    product?.displayName ||
+      product?.specs?.displayName ||
       product?.name ||
       product?.title ||
       title
   ).trim()
   const category = meta(product?.category, 'Handicraft')
-  const technique = meta(product?.craftTechnique || product?.giTag, 'Heritage craft')
+  const technique = meta(
+    product?.craftTechnique || product?.subCategory || product?.giTag,
+    'Heritage craft'
+  )
   const origin = meta(product?.regionOrigin || product?.region_origin)
   const dimensions = meta(product?.dimensions)
   const weight = meta(product?.weight)

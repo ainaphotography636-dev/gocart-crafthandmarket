@@ -23,7 +23,7 @@ export type ClaimableProductSeed = {
   priceUsd: number
   mrpUsd: number
   images: string[]
-  specs: Record<string, string | number>
+  specs: Record<string, string | number | boolean>
 }
 
 export type ClaimableArtisanSeed = {
@@ -84,6 +84,9 @@ export const CLAIMABLE_ARTISAN_SEED: ClaimableArtisanSeed[] = [
         badge: "GI-TAG CERTIFIED",
         series: "In Stock",
         displayName: "Aranmula Mirror Masterpiece",
+        isFeatured: true,
+        featuredOrder: 3,
+        catalogStatus: "approved",
       },
     },
   },
@@ -128,6 +131,9 @@ export const CLAIMABLE_ARTISAN_SEED: ClaimableArtisanSeed[] = [
         badge: "PURE BRONZE",
         series: "Limited Series",
         displayName: "Ceremonial Nilavilakku",
+        isFeatured: true,
+        featuredOrder: 2,
+        catalogStatus: "approved",
       },
     },
   },
@@ -172,6 +178,9 @@ export const CLAIMABLE_ARTISAN_SEED: ClaimableArtisanSeed[] = [
         badge: "GI-TAG HANDLOOM",
         series: "Ready to Ship",
         displayName: "Kasavu Gold Saree",
+        isFeatured: true,
+        featuredOrder: 1,
+        catalogStatus: "approved",
       },
     },
   },

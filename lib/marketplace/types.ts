@@ -49,6 +49,12 @@ export type StorefrontProduct = {
   storeUsername: string
   mediaStorage: "r2" | "unknown"
   createdAt: string | null
+  isFeatured?: boolean
+  featuredOrder?: number
+  badgeLeft?: string
+  badgeRight?: string
+  catalogStatus?: "draft" | "pending" | "approved"
+  displayName?: string
 }
 
 export type ArtisanStorefront = {

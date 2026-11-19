@@ -5,7 +5,9 @@ import {
   isMissingColumnError,
   PRODUCT_SELECT_COMPAT,
   PRODUCT_SELECT_FULL,
+  PRODUCT_SELECT_SPECS,
 } from "@/lib/marketplace/productSelect"
+import { readFeaturedFields } from "@/lib/marketplace/featured"
 import type {
   ArtisanStorefront,
   StorefrontArtisan,
@@ -32,8 +34,12 @@ async function queryProducts(
   if (!full.error) return full
 
   if (isMissingColumnError(full.error)) {
-    const compat = await apply(PRODUCT_SELECT_COMPAT)
-    return compat
+    const specs = await apply(PRODUCT_SELECT_SPECS)
+    if (!specs.error) return specs
+    if (isMissingColumnError(specs.error)) {
+      return await apply(PRODUCT_SELECT_COMPAT)
+    }
+    return specs
   }
 
   return full
@@ -105,6 +111,101 @@ export async function listStorefrontProducts(options?: {
       items: [],
       source: "error",
       error: error instanceof Error ? error.message : "Failed to load products",
+    }
+  }
+}
+
+/**
+ * Featured Luxury Handicrafts — approved + featured products for homepage.
+ * Falls back to newest published rows when none are flagged featured yet.
+ */
+export async function listFeaturedLuxuryProducts(options?: {
+  category?: string | null
+  limit?: number
+}): Promise<CatalogListResult<StorefrontProduct>> {
+  if (!isSupabaseConfigured()) {
+    return { items: [], source: "unavailable" }
+  }
+
+  try {
+    const supabase = await createClient()
+    const limit = options?.limit ?? 8
+
+    const { data, error } = await queryProducts(supabase, (select) =>
+      supabase
+        .from("products")
+        .select(select)
+        .eq("is_published", true)
+        .order("created_at", { ascending: false })
+        .limit(Math.max(limit * 4, 24))
+    )
+
+    if (error) {
+      return { items: [], source: "error", error: error.message }
+    }
+
+    let products = (Array.isArray(data) ? data : []).map((row) => {
+      const mapped = mapProductRow(row as never)
+      const featured = readFeaturedFields(row as Record<string, unknown>)
+      return {
+        ...mapped,
+        isFeatured: featured.isFeatured,
+        featuredOrder: featured.featuredOrder,
+        badgeLeft: featured.badgeLeft,
+        badgeRight: featured.badgeRight,
+        catalogStatus: featured.catalogStatus,
+        displayName: featured.displayName || mapped.title,
+        specs: {
+          ...(mapped.specs || {}),
+          badge: featured.badgeLeft || mapped.specs?.badge,
+          series: featured.badgeRight || mapped.specs?.series,
+          displayName: featured.displayName || mapped.specs?.displayName,
+          isFeatured: featured.isFeatured,
+          featuredOrder: featured.featuredOrder,
+          catalogStatus: featured.catalogStatus,
+        },
+      }
+    })
+
+    const featuredOnly = products.filter((product) => Boolean(product.isFeatured))
+
+    // Prefer explicitly featured; otherwise keep published rows for the grid.
+    products = (featuredOnly.length ? featuredOnly : products)
+      .slice()
+      .sort((a, b) => {
+        const orderA = Number(a.featuredOrder || 0)
+        const orderB = Number(b.featuredOrder || 0)
+        if (orderA !== orderB) return orderA - orderB
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return bTime - aTime
+      })
+
+    const category = String(options?.category || "").trim().toLowerCase()
+    if (category && category !== "all") {
+      products = products.filter((product) => {
+        const hay = [
+          product.category,
+          product.craftTechnique,
+          product.giTag,
+          product.material,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+        return (
+          hay.includes(category) ||
+          category.split(/\s+/).some((part) => hay.includes(part))
+        )
+      })
+    }
+
+    return { items: products.slice(0, limit), source: "supabase" }
+  } catch (error) {
+    return {
+      items: [],
+      source: "error",
+      error: error instanceof Error ? error.message : "Failed to load featured products",
     }
   }
 }

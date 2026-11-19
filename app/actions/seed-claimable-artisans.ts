@@ -151,6 +151,7 @@ async function ensureArtisanRow(
 }
 
 function productPayload(artisanId: string, product: ClaimableProductSeed) {
+  const specs = { ...(product.specs || {}) }
   return {
     artisan_id: artisanId,
     title: product.title,
@@ -163,7 +164,7 @@ function productPayload(artisanId: string, product: ClaimableProductSeed) {
     weight: product.weight,
     region_origin: product.regionOrigin,
     care_instructions: product.careInstructions,
-    specs: product.specs,
+    specs,
     sku: product.sku,
     price_inr: product.priceInr,
     mrp_inr: product.mrpInr,
@@ -174,6 +175,11 @@ function productPayload(artisanId: string, product: ClaimableProductSeed) {
     image_urls: [...product.images],
     in_stock: true,
     is_published: true,
+    is_featured: Boolean(specs.isFeatured),
+    featured_order: Number(specs.featuredOrder || 0) || 0,
+    badge_left: String(specs.badge || "") || null,
+    badge_right: String(specs.series || "") || null,
+    catalog_status: String(specs.catalogStatus || "approved"),
   }
 }
 
@@ -191,9 +197,13 @@ async function upsertCompat(
     weight: _w,
     region_origin: _ro,
     care_instructions: _ci,
-    specs: _sp,
     craft_technique: _ct,
     dimensions: _d,
+    is_featured: _f,
+    featured_order: _fo,
+    badge_left: _bl,
+    badge_right: _br,
+    catalog_status: _cs,
     ...compat
   } = full
 

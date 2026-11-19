@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import RecentlyAddedGallery from '@/components/public/RecentlyAddedGallery'
 import BestSelling from '@/components/public/BestSelling'
-import FeaturedArtisans from '@/components/public/FeaturedArtisans'
 import { listStoreProducts } from '@/lib/productCatalog'
 import { listLiveStores } from '@/lib/storeRegistry'
 import { syncProductMediaBySku } from '@/app/actions/sync-product-media'
-import { getProductImageUrls, getProductThumbnailUrl } from '@/lib/marketplace/media'
+import { getProductImageUrls } from '@/lib/marketplace/media'
 
 function mapLocalProduct(product) {
   const images = getProductImageUrls(product)
@@ -74,10 +73,7 @@ function skuKey(value) {
  * Prefer server (Supabase) catalog; fill missing media from this browser's
  * workshop catalog (same SKU), and sync those R2 URLs back to Supabase.
  */
-export default function HomeCatalogClient({
-  products = [],
-  artisans = [],
-}) {
+export default function HomeCatalogClient({ products = [] }) {
   const [localProducts, setLocalProducts] = useState([])
   const [localArtisans, setLocalArtisans] = useState([])
   const [mediaOverrides, setMediaOverrides] = useState({})
@@ -129,40 +125,13 @@ export default function HomeCatalogClient({
         video: product.video || override?.video || local?.video || null,
         material: product.material || local?.material || null,
         dimensions: product.dimensions || local?.dimensions || null,
+        weight: product.weight || local?.weight || null,
+        regionOrigin:
+          product.regionOrigin || local?.regionOrigin || null,
         craftTechnique: product.craftTechnique || local?.craftTechnique || null,
       }
     })
   }, [products, localProducts, mediaOverrides])
-
-  const displayArtisans = useMemo(() => {
-    const base = artisans.length ? artisans : localArtisans.slice(0, 6)
-    return base.map((artisan) => {
-      const local = localArtisans.find(
-        (item) =>
-          String(item.username || '').toLowerCase() ===
-          String(artisan.username || '').toLowerCase()
-      )
-      const logo =
-        artisan.logoUrl ||
-        artisan.logo ||
-        local?.logoUrl ||
-        local?.logo ||
-        getProductThumbnailUrl(
-          displayProducts.find(
-            (product) =>
-              String(product.artisanUsername || product.storeUsername || '')
-                .toLowerCase() === String(artisan.username || '').toLowerCase()
-          )
-        ) ||
-        null
-
-      return {
-        ...artisan,
-        logoUrl: logo,
-        logo,
-      }
-    })
-  }, [artisans, localArtisans, displayProducts])
 
   useEffect(() => {
     if (syncedRef.current) return
@@ -194,21 +163,6 @@ export default function HomeCatalogClient({
       }
     }
 
-    // Also push first product photo as workshop logo when store has none.
-    for (const artisan of artisans) {
-      if (artisan.logoUrl || artisan.logo) continue
-      const photo = getProductThumbnailUrl(
-        displayProducts.find(
-          (product) =>
-            String(product.artisanUsername || product.storeUsername || '')
-              .toLowerCase() === String(artisan.username || '').toLowerCase()
-        )
-      )
-      if (photo && artisan.username) {
-        payload.push({ username: artisan.username, logoUrl: photo })
-      }
-    }
-
     if (!payload.length) return
     syncedRef.current = true
 
@@ -227,12 +181,11 @@ export default function HomeCatalogClient({
         setMediaOverrides((prev) => ({ ...prev, ...next }))
       }
     })
-  }, [localProducts, localArtisans, products, artisans, displayProducts])
+  }, [localProducts, localArtisans, products])
 
   return (
     <>
       <RecentlyAddedGallery products={displayProducts} />
-      <FeaturedArtisans artisans={displayArtisans} />
       <BestSelling products={displayProducts} />
     </>
   )

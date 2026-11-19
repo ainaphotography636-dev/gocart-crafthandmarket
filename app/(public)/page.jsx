@@ -1,32 +1,42 @@
 import Hero from "@/components/public/Hero"
-import CategoriesMarquee from "@/components/public/CategoriesMarquee"
 import Newsletter from "@/components/public/Newsletter"
-import OurSpecs from "@/components/public/OurSpec"
+import GuaranteeStrip from "@/components/public/GuaranteeStrip"
+import HeritageStory from "@/components/public/HeritageStory"
+import CategoriesMarquee from "@/components/public/CategoriesMarquee"
+import LogisticsBand from "@/components/public/LogisticsBand"
 import HomeCatalogClient from "@/components/public/HomeCatalogClient"
 import CatalogHydrator from "@/components/marketplace/CatalogHydrator"
 import CatalogMediaBridge from "@/components/marketplace/CatalogMediaBridge"
 import {
-  listStorefrontArtisans,
+  listFeaturedLuxuryProducts,
   listStorefrontProducts,
 } from "@/lib/marketplace/catalog"
+import { ensureClaimableLuxuryCatalog } from "@/app/actions/seed-claimable-artisans"
 
 export default async function Home() {
-  const [recent, artisans] = await Promise.all([
+  // Ensure claimable workshops/products exist, then load featured + recent.
+  await ensureClaimableLuxuryCatalog()
+
+  const [featured, recent] = await Promise.all([
+    listFeaturedLuxuryProducts({ limit: 8 }),
     listStorefrontProducts({
       limit: 8,
       requireInStock: false,
     }),
-    listStorefrontArtisans({ limit: 6 }),
   ])
+
+  const homepageProducts = featured.items.length ? featured.items : recent.items
 
   return (
     <div>
-      <CatalogHydrator products={recent.items} replace />
-      <CatalogMediaBridge products={recent.items} />
+      <CatalogHydrator products={homepageProducts} replace />
+      <CatalogMediaBridge products={homepageProducts} />
       <Hero />
-      <HomeCatalogClient products={recent.items} artisans={artisans.items} />
+      <HomeCatalogClient products={homepageProducts} />
       <CategoriesMarquee />
-      <OurSpecs />
+      <GuaranteeStrip />
+      <HeritageStory />
+      <LogisticsBand />
       <Newsletter />
     </div>
   )

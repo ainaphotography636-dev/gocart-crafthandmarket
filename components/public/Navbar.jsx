@@ -1,161 +1,228 @@
 'use client'
-import { Menu, Search, ShoppingCart, X } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useSelector } from "react-redux";
-import BrandLogo from "@/components/shared/BrandLogo";
-import CurrencySwitcher from "@/components/shared/CurrencySwitcher";
+import { ChevronDown, Menu, Search, ShoppingBag, X } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { useSelector } from "react-redux"
+import BrandLogo from "@/components/shared/BrandLogo"
+import CurrencySwitcher from "@/components/shared/CurrencySwitcher"
+import { HANDICRAFT_CATEGORIES } from "@/lib/handicraftCategories"
 
 const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/shop", label: "Shop" },
-    { href: "/artisans", label: "Artisans" },
-    { href: "/artisan/join", label: "Become an Artisan" },
-    { href: "/pricing", label: "Pricing" },
+  { href: "/#masterpieces", label: "MASTERPIECES" },
+  { href: "/#crafts", label: "TRADITIONS" },
+  { href: "/#guarantees", label: "CORE VALUES" },
+  { href: "/#mission", label: "MISSION" },
+  { href: "/#guarantees", label: "GUARANTEES" },
 ]
 
 /**
- * Crafthand Market public Navbar.
- * Preserves GoCart cart count via Redux (`state.cart.total`) and routes
- * cart interactions to `/cart`. Login links to Supabase Auth (`/auth/login`).
+ * CraftHand Market public Navbar — logo mark, masterpieces anchor,
+ * categories dropdown, search, and cart.
  */
 const Navbar = () => {
-    const router = useRouter()
-    const [search, setSearch] = useState('')
-    const [mobileOpen, setMobileOpen] = useState(false)
-    const cartCount = useSelector((state) => state.cart.total)
+  const router = useRouter()
+  const [search, setSearch] = useState("")
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
+  const categoriesRef = useRef(null)
+  const cartCount = useSelector((state) => state.cart.total)
 
-    const handleSearch = (e) => {
-        e.preventDefault()
-        const q = search.trim()
-        router.push(q ? `/shop?search=${encodeURIComponent(q)}` : '/shop')
-        setMobileOpen(false)
+  useEffect(() => {
+    const onPointer = (event) => {
+      if (!categoriesRef.current?.contains(event.target)) {
+        setCategoriesOpen(false)
+      }
     }
+    document.addEventListener("mousedown", onPointer)
+    return () => document.removeEventListener("mousedown", onPointer)
+  }, [])
 
-    const handleCartOpen = () => {
-        // GoCart cart "drawer" equivalent: navigate to cart page with Redux state.
-        setMobileOpen(false)
-        router.push('/cart')
-    }
+  const handleSearch = (e) => {
+    e.preventDefault()
+    const q = search.trim()
+    router.push(q ? `/shop?search=${encodeURIComponent(q)}` : "/shop")
+    setMobileOpen(false)
+  }
 
-    return (
-        <nav className="relative bg-brand-cream/95 backdrop-blur-sm border-b border-brand-gold/20">
-            <div className="mx-4 sm:mx-6">
-                <div className="flex items-center justify-between max-w-7xl mx-auto py-3 sm:py-4 gap-3">
-                    <BrandLogo badge="plus" />
+  const handleCartOpen = () => {
+    setMobileOpen(false)
+    router.push("/cart")
+  }
 
-                    {/* Desktop */}
-                    <div className="hidden sm:flex items-center gap-4 lg:gap-7 text-slate-600">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.href + link.label}
-                                href={link.href}
-                                className="hover:text-brand-emerald transition"
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
+  return (
+    <nav className="relative border-b border-slate-200/80 bg-white shadow-[0_1px_0_rgba(30,41,59,0.04)]">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-3.5">
+        <BrandLogo />
 
-                        <form
-                            onSubmit={handleSearch}
-                            className="hidden xl:flex items-center w-xs text-sm gap-2 bg-amber-50 px-4 py-3 rounded-full border border-brand-gold/20"
-                        >
-                            <Search size={18} className="text-brand-amber" />
-                            <input
-                                className="w-full bg-transparent outline-none placeholder-slate-600"
-                                type="text"
-                                placeholder="Search artisan goods"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </form>
+        <div className="hidden items-center gap-5 lg:flex xl:gap-6">
+          <Link
+            href="/#masterpieces"
+            className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-slate transition hover:text-brand-terracotta"
+          >
+            Masterpieces
+          </Link>
 
-                        <CurrencySwitcher />
+          <div className="relative" ref={categoriesRef}>
+            <button
+              type="button"
+              onClick={() => setCategoriesOpen((open) => !open)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-brand-slate transition hover:text-brand-terracotta"
+              aria-expanded={categoriesOpen}
+            >
+              Categories
+              <ChevronDown size={14} className={categoriesOpen ? "rotate-180 transition" : "transition"} />
+            </button>
+            {categoriesOpen ? (
+              <div className="absolute left-0 top-full z-50 mt-3 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <Link
+                  href="/shop"
+                  onClick={() => setCategoriesOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-sm text-brand-slate hover:bg-brand-cream"
+                >
+                  All Categories
+                </Link>
+                {HANDICRAFT_CATEGORIES.map((category) => (
+                  <Link
+                    key={category}
+                    href={`/shop?search=${encodeURIComponent(category)}`}
+                    onClick={() => setCategoriesOpen(false)}
+                    className="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-brand-cream hover:text-brand-slate"
+                  >
+                    {category}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
-                        <button
-                            type="button"
-                            onClick={handleCartOpen}
-                            className="relative flex items-center gap-2 text-slate-600 hover:text-brand-emerald transition"
-                            aria-label={`Open cart, ${cartCount} items`}
-                        >
-                            <ShoppingCart size={18} />
-                            Cart
-                            <span className="absolute -top-1 left-3 text-[8px] text-white bg-brand-amber size-3.5 rounded-full flex items-center justify-center">
-                                {cartCount}
-                            </span>
-                        </button>
+          {navLinks.slice(1).map((link) => (
+            <Link
+              key={link.label}
+              href={link.href}
+              className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-slate transition hover:text-brand-terracotta"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
 
-                        <Link
-                            href="/auth/login"
-                            className="px-8 py-2 bg-brand-emerald hover:bg-brand-amber transition text-white rounded-full"
-                        >
-                            Login
-                        </Link>
-                    </div>
+        <div className="hidden items-center gap-3 md:flex">
+          <form
+            onSubmit={handleSearch}
+            className="flex w-48 items-center gap-2 rounded-full bg-slate-100 px-3.5 py-2.5 text-sm lg:w-56 xl:w-64"
+          >
+            <Search size={16} className="shrink-0 text-slate-400" />
+            <input
+              className="w-full bg-transparent outline-none placeholder:text-slate-400"
+              type="text"
+              placeholder="Search luxury artifact..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </form>
 
-                    {/* Mobile controls — cart + auth + menu */}
-                    <div className="sm:hidden flex items-center gap-2">
-                        <CurrencySwitcher />
-                        <button
-                            type="button"
-                            onClick={handleCartOpen}
-                            className="relative p-2 text-slate-700"
-                            aria-label={`Open cart, ${cartCount} items`}
-                        >
-                            <ShoppingCart size={20} />
-                            <span className="absolute top-0.5 right-0.5 text-[8px] text-white bg-brand-amber size-3.5 rounded-full flex items-center justify-center">
-                                {cartCount}
-                            </span>
-                        </button>
-                        <Link
-                            href="/auth/login"
-                            className="px-4 py-1.5 bg-brand-emerald hover:bg-brand-amber text-sm transition text-white rounded-full"
-                            onClick={() => setMobileOpen(false)}
-                        >
-                            Login
-                        </Link>
-                        <button
-                            type="button"
-                            onClick={() => setMobileOpen((v) => !v)}
-                            className="p-2 text-slate-700"
-                            aria-expanded={mobileOpen}
-                            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-                        >
-                            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-                        </button>
-                    </div>
-                </div>
+          <CurrencySwitcher />
 
-                {mobileOpen && (
-                    <div className="sm:hidden border-t border-brand-gold/20 py-4 max-w-7xl mx-auto">
-                        <form onSubmit={handleSearch} className="flex items-center gap-2 bg-amber-50 px-3 py-2.5 rounded-full border border-brand-gold/20 mb-4">
-                            <Search size={16} className="text-brand-amber" />
-                            <input
-                                className="w-full bg-transparent outline-none text-sm placeholder-slate-600"
-                                type="text"
-                                placeholder="Search artisan goods"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
-                        </form>
-                        <div className="flex flex-col gap-1 text-slate-700">
-                            {navLinks.map((link) => (
-                                <Link
-                                    key={link.href + link.label}
-                                    href={link.href}
-                                    onClick={() => setMobileOpen(false)}
-                                    className="px-2 py-2.5 rounded-md hover:bg-brand-emerald-soft hover:text-brand-emerald transition"
-                                >
-                                    {link.label}
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        </nav>
-    )
+          <button
+            type="button"
+            onClick={handleCartOpen}
+            className="relative flex size-10 items-center justify-center rounded-full bg-slate-100 text-brand-slate transition hover:bg-slate-200"
+            aria-label={`Open cart, ${cartCount} items`}
+          >
+            <ShoppingBag size={18} />
+            {cartCount > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-brand-terracotta text-[9px] font-bold text-white">
+                {cartCount > 9 ? "9+" : cartCount}
+              </span>
+            ) : null}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={handleCartOpen}
+            className="relative flex size-10 items-center justify-center rounded-full bg-slate-100 text-brand-slate"
+            aria-label={`Open cart, ${cartCount} items`}
+          >
+            <ShoppingBag size={18} />
+            {cartCount > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-brand-terracotta text-[9px] font-bold text-white">
+                {cartCount > 9 ? "9+" : cartCount}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="p-2 text-brand-slate"
+            aria-expanded={mobileOpen}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+      </div>
+
+      {mobileOpen ? (
+        <div className="border-t border-slate-200 px-4 py-4 md:hidden">
+          <form
+            onSubmit={handleSearch}
+            className="mb-4 flex items-center gap-2 rounded-full bg-slate-100 px-3.5 py-2.5 text-sm"
+          >
+            <Search size={16} className="text-slate-400" />
+            <input
+              className="w-full bg-transparent outline-none placeholder:text-slate-400"
+              type="text"
+              placeholder="Search luxury artifact..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </form>
+          <div className="flex flex-col gap-1">
+            <Link
+              href="/#masterpieces"
+              onClick={() => setMobileOpen(false)}
+              className="px-2 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-slate"
+            >
+              Masterpieces
+            </Link>
+            <p className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Categories
+            </p>
+            {HANDICRAFT_CATEGORIES.map((category) => (
+              <Link
+                key={category}
+                href={`/shop?search=${encodeURIComponent(category)}`}
+                onClick={() => setMobileOpen(false)}
+                className="px-2 py-2 text-sm text-slate-600"
+              >
+                {category}
+              </Link>
+            ))}
+            {navLinks.slice(1).map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className="px-2 py-2.5 text-sm font-semibold uppercase tracking-wide text-brand-slate"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              href="/auth/login"
+              onClick={() => setMobileOpen(false)}
+              className="mt-2 px-2 py-2.5 text-sm text-brand-forest"
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </nav>
+  )
 }
 
 export default Navbar

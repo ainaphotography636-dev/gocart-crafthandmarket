@@ -2,9 +2,9 @@
 import Link from 'next/link'
 
 const badgeStyles = {
-  plus: 'bg-brand-gold text-white',
+  plus: 'bg-brand-terracotta text-white',
   admin: 'bg-brand-amber text-white',
-  store: 'bg-brand-emerald text-white',
+  store: 'bg-brand-forest text-white',
 }
 
 const badgeLabels = {
@@ -14,24 +14,34 @@ const badgeLabels = {
 }
 
 /**
- * Crafthand Market brand mark — shared across public, store, and admin shells.
+ * CraftHand Market brand mark — colors sampled from the logo:
+ * Craft #C85A32 · Hand #1E293B · Market #0F766E
  */
-export default function BrandLogo({ href = '/', badge, className = '' }) {
+export default function BrandLogo({ href = '/', badge, className = '', compact = false }) {
   return (
     <Link
       href={href}
-      aria-label="Crafthand Market home"
-      className={`relative inline-flex items-center gap-2 text-xl sm:text-2xl font-semibold tracking-tight text-slate-800 ${className}`}
+      aria-label="CraftHand Market home"
+      className={`relative inline-flex items-center gap-2.5 ${className}`}
     >
-      <span className="leading-none">
-        <span className="text-brand-amber">Craft</span>
-        <span className="text-slate-800">hand</span>
-        {' '}
-        <span className="text-brand-emerald">Market</span>
+      <span
+        aria-hidden
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#3a2a22] to-brand-slate text-base font-bold text-white sm:size-10 sm:text-lg"
+      >
+        C
+      </span>
+      <span className={`flex flex-col leading-none ${compact ? 'gap-0.5' : 'gap-1'}`}>
+        <span className="text-lg font-bold tracking-tight sm:text-xl">
+          <span className="text-brand-terracotta">Craft</span>
+          <span className="text-brand-slate">hand</span>
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-brand-forest">
+          Market
+        </span>
       </span>
       {badge ? (
         <span
-          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${badgeStyles[badge] || badgeStyles.plus}`}
+          className={`ml-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeStyles[badge] || badgeStyles.plus}`}
         >
           {badgeLabels[badge] || badge}
         </span>

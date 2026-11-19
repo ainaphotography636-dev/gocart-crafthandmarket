@@ -1,130 +1,99 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import Title from './Title'
-import SafeImage from '@/components/shared/SafeImage'
-import { useCurrency } from '@/components/shared/CurrencyProvider'
-import { formatProductTitle } from '@/lib/productCodes'
-import { getProductThumbnailUrl } from '@/lib/marketplace/media'
-
-function stockLabel(product) {
-  const qty = Number(product?.specs?.stockQuantity)
-  if (Number.isFinite(qty) && qty >= 0) {
-    if (qty === 0) return 'Out of stock'
-    return `${qty} in stock`
-  }
-  return product?.inStock ? 'In stock' : 'Out of stock'
-}
-
-function GalleryCard({ product }) {
-  const { currency } = useCurrency()
-  const currencySymbol = currency.symbol
-  const image = getProductThumbnailUrl(product)
-  const material = String(product?.material || '').trim()
-  const dimensions = String(product?.dimensions || '').trim()
-  const inStock = Boolean(product?.inStock)
-  const stockText = stockLabel(product)
-
-  return (
-    <Link
-      href={`/product/${product.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm transition hover:border-brand-emerald/40 hover:shadow-md"
-    >
-      <div className="relative flex h-44 items-center justify-center overflow-hidden bg-[#F5F5F5] sm:h-52">
-        <SafeImage
-          width={500}
-          height={500}
-          className="max-h-36 w-auto object-contain transition duration-300 group-hover:scale-105 sm:max-h-44"
-          src={image}
-          alt={formatProductTitle(product)}
-        />
-        {product.category ? (
-          <span className="absolute left-2.5 top-2.5 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
-            {product.category}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 p-3.5 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-medium leading-snug text-slate-800 line-clamp-2">
-            {formatProductTitle(product)}
-          </h3>
-          <p className="shrink-0 text-sm font-semibold text-slate-900">
-            {currencySymbol}
-            {Number(product.price || 0).toLocaleString()}
-          </p>
-        </div>
-
-        <p
-          className={`text-xs font-medium ${
-            inStock ? 'text-brand-emerald' : 'text-slate-400'
-          }`}
-        >
-          {stockText}
-        </p>
-
-        <dl className="mt-auto space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-500">
-          <div className="flex justify-between gap-2">
-            <dt className="text-slate-400">Material</dt>
-            <dd className="truncate text-right text-slate-700">
-              {material || '—'}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-2">
-            <dt className="text-slate-400">Dimensions</dt>
-            <dd className="truncate text-right text-slate-700">
-              {dimensions || '—'}
-            </dd>
-          </div>
-        </dl>
-
-        {product.artisanName ? (
-          <p className="text-[11px] text-slate-400">by {product.artisanName}</p>
-        ) : null}
-      </div>
-    </Link>
-  )
-}
+import LuxuryProductCard from './LuxuryProductCard'
+import { HANDICRAFT_CATEGORIES } from '@/lib/handicraftCategories'
 
 export default function RecentlyAddedGallery({ products = [] }) {
   const items = Array.isArray(products) ? products : []
-  const count = items.length
+  const [category, setCategory] = useState('all')
+
+  const filtered = useMemo(() => {
+    if (category === 'all') return items
+    const needle = category.toLowerCase()
+    return items.filter((product) => {
+      const hay = [
+        product?.category,
+        product?.giTag,
+        product?.craftTechnique,
+        product?.material,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(needle) || needle.split(/\s+/).some((part) => hay.includes(part))
+    })
+  }, [items, category])
+
+  const count = filtered.length
 
   return (
-    <section className="mx-auto my-16 max-w-6xl px-6 sm:my-20">
-      <Title
-        title="Recently Added"
-        description={
-          count
-            ? `Fresh workshop pieces — showing ${count} latest listing${count === 1 ? '' : 's'}`
-            : 'Published handicrafts from verified workshops will appear here'
-        }
-        href="/shop"
-        visibleButton={count > 0}
-      />
+    <section
+      id="masterpieces"
+      className="scroll-mt-24 bg-brand-cream px-6 py-16 sm:px-8 sm:py-20"
+    >
+      <div className="mx-auto max-w-[90rem]">
+        <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-terracotta">
+              Exquisite Catalog
+            </p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-brand-slate sm:text-3xl">
+              Featured Luxury Handicrafts
+            </h2>
+          </div>
 
-      {count === 0 ? (
-        <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-12 text-center">
-          <p className="text-sm text-slate-600">
-            No storefront pieces yet. Sign in, open Add Product, upload 4+ photos,
-            then click <span className="font-medium text-slate-800">Publish Piece</span> —
-            your workshop and product will appear here.
-          </p>
-          <Link
-            href="/store/add-product"
-            className="mt-4 inline-flex text-sm font-medium text-brand-emerald hover:text-brand-amber"
-          >
-            Add a product
-          </Link>
+          <label className="flex items-center gap-2 text-sm text-slate-500">
+            <span className="whitespace-nowrap">Category:</span>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-brand-slate outline-none transition focus:border-brand-forest"
+            >
+              <option value="all">All Categories &amp; Sub-categories</option>
+              {HANDICRAFT_CATEGORIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      ) : (
-        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {items.map((product) => (
-            <GalleryCard key={product.id} product={product} />
-          ))}
-        </div>
-      )}
+
+        {items.length === 0 ? (
+          <div className="mt-10 border border-dashed border-brand-forest/20 bg-white/70 px-6 py-14 text-center">
+            <p className="text-sm text-slate-600">
+              No masterpieces published yet. Add a workshop piece with photos and publish
+              to feature it here.
+            </p>
+            <Link
+              href="/store/add-product"
+              className="mt-4 inline-flex text-sm font-medium text-brand-terracotta hover:underline"
+            >
+              Add a product
+            </Link>
+          </div>
+        ) : count === 0 ? (
+          <div className="mt-10 border border-dashed border-slate-200 bg-white/70 px-6 py-12 text-center text-sm text-slate-600">
+            No pieces match this category. Try another filter or{' '}
+            <button
+              type="button"
+              onClick={() => setCategory('all')}
+              className="font-medium text-brand-terracotta hover:underline"
+            >
+              view all masterpieces
+            </button>
+            .
+          </div>
+        ) : (
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {filtered.slice(0, 4).map((product) => (
+              <LuxuryProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }

@@ -71,7 +71,7 @@ export default function ShopCatalog({
         ) : null}
 
         {products.length ? (
-          <div className="mx-auto mb-32 grid grid-cols-2 gap-6 sm:flex sm:flex-wrap xl:gap-12">
+          <div className="mx-auto mb-32 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

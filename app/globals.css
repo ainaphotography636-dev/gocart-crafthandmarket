@@ -1,18 +1,23 @@
 @import "tailwindcss";
 
-/* Crafthand Market — premium artisan palette (Tailwind v4 theme tokens) */
+/* CraftHand Market — logo-sampled palette (Tailwind v4 theme tokens)
+   Craft #C85A32 · Hand #1E293B · Market #0F766E */
 @theme {
-  --color-brand-amber: #c2410c;
-  --color-brand-amber-light: #fdba74;
-  --color-brand-amber-soft: #fff7ed;
-  --color-brand-emerald: #047857;
-  --color-brand-emerald-light: #6ee7b7;
-  --color-brand-emerald-soft: #ecfdf5;
+  --color-brand-amber: #c85a32;
+  --color-brand-amber-light: #e08a66;
+  --color-brand-amber-soft: #fbf1eb;
+  --color-brand-emerald: #0f766e;
+  --color-brand-emerald-light: #14b8a6;
+  --color-brand-emerald-soft: #e6f5f3;
   --color-brand-gold: #b45309;
   --color-brand-gold-light: #fbbf24;
   --color-brand-gold-rich: #ca8a04;
-  --color-brand-ink: #292524;
-  --color-brand-cream: #faf6f1;
+  --color-brand-ink: #1e293b;
+  --color-brand-cream: #f8f5f0;
+  --color-brand-forest: #0f766e;
+  --color-brand-slate: #1e293b;
+  --color-brand-terracotta: #c85a32;
+  --font-family-display: var(--font-display), "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 @layer components {

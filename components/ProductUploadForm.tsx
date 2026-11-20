@@ -33,6 +33,7 @@ import {
 } from "@/lib/compressAndUploadVideo"
 import { getActiveStore } from "@/lib/storeRegistry"
 import { formatProductTitle } from "@/lib/productCodes"
+import { GIFTING_GROUPS } from "@/lib/giftingCategories"
 
 type UploadedImage = {
   id: string
@@ -190,6 +191,7 @@ export default function ProductUploadForm({
   const [error, setError] = useState("")
   const [productInfo, setProductInfo] = useState<ProductFields>(emptyFields())
   const [customSpecs, setCustomSpecs] = useState<CustomSpec[]>([])
+  const [giftingCategories, setGiftingCategories] = useState<string[]>([])
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null)
 
   useEffect(() => {
@@ -534,6 +536,7 @@ export default function ProductUploadForm({
         username: store.username,
         artisanCode,
         customSpecs,
+        giftingCategories,
       })
 
       const now = new Date().toISOString()
@@ -922,6 +925,64 @@ export default function ProductUploadForm({
                 ))}
               </select>
             </label>
+
+            <div className="block">
+              <span className={labelClass}>
+                Gifting Categories{" "}
+                <span className="font-normal text-slate-400">
+                  (select all that fit — shown on /gifting)
+                </span>
+              </span>
+              <div className="mt-2 max-h-64 space-y-4 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/80 p-3 sm:p-4">
+                {GIFTING_GROUPS.map((group) => (
+                  <div key={group.id}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-emerald">
+                      {group.title}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {group.items.map((tag) => {
+                        const checked = giftingCategories.includes(tag)
+                        return (
+                          <label
+                            key={`${group.id}-${tag}`}
+                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition ${
+                              checked
+                                ? "border-brand-emerald bg-brand-emerald-soft text-brand-emerald"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-brand-emerald/40"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              onChange={() => {
+                                setGiftingCategories((prev) =>
+                                  checked
+                                    ? prev.filter((item) => item !== tag)
+                                    : [...prev, tag]
+                                )
+                              }}
+                            />
+                            {tag}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {giftingCategories.length ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Selected: {giftingCategories.length} gifting tag
+                  {giftingCategories.length === 1 ? "" : "s"}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-400">
+                  Optional — helps shoppers find this piece under the right gift occasions.
+                </p>
+              )}
+            </div>
+
             <label className="block">
               <span className={labelClass}>Story & Description</span>
               <textarea

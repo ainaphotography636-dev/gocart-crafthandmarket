@@ -12,13 +12,13 @@ const CategoriesMarquee = () => {
 
   return (
     <section
-      id="crafts"
+      id="categories"
       className="scroll-mt-24 w-full border-y border-brand-forest/10 bg-brand-cream py-8 sm:py-12"
     >
       <div className="mx-auto mb-5 flex max-w-7xl items-end justify-between gap-3 px-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-terracotta">
-            Craft categories
+            Categories
           </p>
           <h2 className="mt-2 text-xl font-medium text-brand-slate sm:text-2xl">
             Brass · Handlooms · GI-Tag artifacts

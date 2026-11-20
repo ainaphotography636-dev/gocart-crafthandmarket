@@ -18,7 +18,7 @@ export default function HeritageStory() {
         </div>
 
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-brand-terracotta">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-terracotta">
             Mission
           </p>
           <h2 className="mt-3 font-[family-name:var(--font-display)] text-3xl leading-tight text-brand-slate sm:text-4xl">

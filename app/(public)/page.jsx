@@ -1,11 +1,12 @@
 import Hero from "@/components/public/Hero"
 import Newsletter from "@/components/public/Newsletter"
-import GuaranteeStrip from "@/components/public/GuaranteeStrip"
+import CoreValues from "@/components/public/CoreValues"
+import Guarantees from "@/components/public/Guarantees"
 import HeritageStory from "@/components/public/HeritageStory"
 import HeritageCraftPillars from "@/components/public/HeritageCraftPillars"
 import CategoriesMarquee from "@/components/public/CategoriesMarquee"
-import LogisticsBand from "@/components/public/LogisticsBand"
 import HomeCatalogClient from "@/components/public/HomeCatalogClient"
+import HashScroll from "@/components/public/HashScroll"
 import CatalogHydrator from "@/components/marketplace/CatalogHydrator"
 import CatalogMediaBridge from "@/components/marketplace/CatalogMediaBridge"
 import {
@@ -30,15 +31,22 @@ export default async function Home() {
 
   return (
     <div>
+      <HashScroll />
       <CatalogHydrator products={homepageProducts} replace />
       <CatalogMediaBridge products={homepageProducts} />
       <Hero />
+      {/* MASTERPIECES → /#masterpieces */}
       <HomeCatalogClient products={homepageProducts} />
+      {/* CATEGORIES → /#categories */}
       <CategoriesMarquee />
+      {/* TRADITIONS → /#traditions */}
       <HeritageCraftPillars />
-      <GuaranteeStrip />
+      {/* CORE VALUES → /#core-values */}
+      <CoreValues />
+      {/* MISSION → /#mission */}
       <HeritageStory />
-      <LogisticsBand />
+      {/* GUARANTEES → /#guarantees */}
+      <Guarantees />
       <Newsletter />
     </div>
   )

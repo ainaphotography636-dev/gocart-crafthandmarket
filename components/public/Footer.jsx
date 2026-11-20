@@ -46,6 +46,11 @@ const Footer = () => {
                                     crafthand.market
                                 </Link>
                             </li>
+                            <li>
+                                <Link href="/gifting" className="text-white/80 hover:text-white">
+                                    Gifting catalog
+                                </Link>
+                            </li>
                             <li className="text-white/80">WhatsApp Concierge Support Available</li>
                             <li className="text-white/80">International Air Logistics</li>
                             <li>

@@ -27,6 +27,8 @@ export type HandicraftSpecs = {
   giTag?: string | null
   stockQuantity?: number | null
   custom?: CustomSpec[]
+  /** Gifting taxonomy tags for /gifting storefront filters */
+  giftingCategories?: string[]
 }
 
 export type MarketplaceProductInput = {
@@ -125,6 +127,7 @@ type ParsedProductInput = {
   giTag: string | null
   stockQuantity: number | null
   customSpecs: CustomSpec[]
+  giftingCategories: string[]
 }
 
 function validateProductInput(
@@ -214,6 +217,11 @@ function validateProductInput(
       giTag: String(specs.giTag || "").trim() || null,
       stockQuantity,
       customSpecs: normalizeCustomSpecs(specs.custom),
+      giftingCategories: Array.isArray(specs.giftingCategories)
+        ? specs.giftingCategories
+            .map((tag) => String(tag || "").trim())
+            .filter(Boolean)
+        : [],
     },
   }
 }
@@ -440,6 +448,7 @@ export async function createMarketplaceProduct(
     giTag: parsed.giTag,
     stockQuantity: parsed.stockQuantity,
     custom: parsed.customSpecs,
+    giftingCategories: parsed.giftingCategories,
   }
 
   const inStock =
@@ -594,6 +603,8 @@ export type PublishHandicraftProductInput = {
   username?: string | null
   artisanCode?: string | null
   customSpecs?: CustomSpec[] | null
+  /** Selected gifting taxonomy tags (occasions, relationships, hampers, etc.) */
+  giftingCategories?: string[] | null
 }
 
 export async function publishHandicraftProduct(
@@ -603,6 +614,11 @@ export async function publishHandicraftProduct(
     ? input.image_urls
     : []
   const isPublished = Boolean(input?.isPublished)
+  const giftingCategories = Array.isArray(input?.giftingCategories)
+    ? input.giftingCategories
+        .map((tag) => String(tag || "").trim())
+        .filter(Boolean)
+    : []
 
   return createMarketplaceProduct({
     title: input.title,
@@ -624,6 +640,7 @@ export async function publishHandicraftProduct(
       regionOrigin: input.originRegion,
       stockQuantity: Number(input.stockQuantity),
       custom: input.customSpecs || [],
+      giftingCategories,
     },
   })
 }

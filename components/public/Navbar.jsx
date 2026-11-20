@@ -10,6 +10,7 @@ import { HANDICRAFT_CATEGORIES } from "@/lib/handicraftCategories"
 
 const navLinks = [
   { href: "/#masterpieces", label: "MASTERPIECES" },
+  { href: "/gifting", label: "GIFTING" },
   { href: "/#traditions", label: "TRADITIONS" },
   { href: "/#core-values", label: "CORE VALUES" },
   { href: "/#mission", label: "MISSION" },
